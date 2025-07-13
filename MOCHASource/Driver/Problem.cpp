@@ -1,5 +1,5 @@
-#pragma once
 #include "DEMSolver.h"
+#include "ExternalForceTorque.cuh"
 
 //template
 class Problem : public DEMSolver
@@ -124,11 +124,7 @@ public:
 		sphForce += constantForce;
 		cudaMemcpy(d.spheres.state.forces + idx, &sphForce, sizeof(double3), cudaMemcpyHostToDevice);
 
-		int grid = 1, block = 1;
-		int numObjects = d.spheres.num;
-		computeGPUParameter(grid, block, numObjects, h.simulation.maxThreadsPerBlock);
-		calculateGlobalDampingForceTorque<< <grid, block >> >(d.spheres, 0.1);
-		cudaDeviceSynchronize();
+		calculateGlobalDampingForceTorque(d.spheres, 0.1, h.simulation.maxThreadsPerBlock);
 	}
 
 	void outputData(const HostData& h, int frame, int step) override
@@ -292,8 +288,8 @@ public:
 
 	void handleDataAfterContact(HostData& h, DeviceData& d)override
 	{
-		double theta_m = 10 * pi() / 180.; // Wave angle in radians
-		double omega = 2 * pi(); // Wave frequency
+		constexpr double theta_m = 10 * pi() / 180.; // Wave angle in radians
+		constexpr double omega = 2 * pi(); // Wave frequency
 		if (int(h.simulation.currentTime/h.simulation.timeStep) == iStepStartMaking)
 		{
 			h.triangleWalls.addPlaneWall(make_double3(0., 0.25, 0.), make_double3(0., 0.0, 0.), make_double3(0., 0.0, 0.5), make_double3(0., 0.5, 0.5), make_double3(0., 0.5, 0.), 1);
@@ -475,17 +471,7 @@ public:
 		double waterLevel0 = 0; // Initial water level
 		double Cd = 0.4; // Drag coefficient for spheres in water
 		double3 currentVel = make_double3(0.1, 0., 0.); // Current velocity of the fluid
-
-		int grid = 1, block = 1;
-		int numObjects = 0;
-		numObjects = d.spheres.num;
-		computeGPUParameter(grid, block, numObjects, h.simulation.maxThreadsPerBlock);
-		calHydroForce << <grid, block >> > (d.spheres,
-			currentVel,
-			waterDensity,
-			waterLevel0,
-			Cd);
-		//cudaDeviceSynchronize();
+		calculateHydroForce(d.spheres, currentVel, waterDensity, waterLevel0, Cd, h.simulation.maxThreadsPerBlock);
 	}
 
 	void outputData(const HostData& h, int frame, int step) override
@@ -635,17 +621,7 @@ public:
 		double waterLevel0 = 0; // Initial water level
 		double Cd = 0.1; // Drag coefficient for spheres in water
 		double3 currentVel = make_double3(0., 0., 0.); // Current velocity of the fluid
-
-		int grid = 1, block = 1;
-		int numObjects = 0;
-		numObjects = d.spheres.num;
-		computeGPUParameter(grid, block, numObjects, h.simulation.maxThreadsPerBlock);
-		calHydroForce << <grid, block >> > (d.spheres,
-			currentVel,
-			waterDensity,
-			waterLevel0,
-			Cd);
-		//cudaDeviceSynchronize();
+		calculateHydroForce(d.spheres, currentVel, waterDensity, waterLevel0, Cd, h.simulation.maxThreadsPerBlock);
 	}
 
 	void outputData(const HostData& h, int frame, int step) override

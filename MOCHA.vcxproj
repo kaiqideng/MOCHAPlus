@@ -11,15 +11,17 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <CudaCompile Include="CalculateForceTorque.cu" />
+    <CudaCompile Include="CalculateContactForceTorque.cu" />
+    <CudaCompile Include="ExternalForceTorque.cu" />
     <CudaCompile Include="Integrate.cu" />
     <CudaCompile Include="NeighborSearch.cu" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="CalculateForceTorque.cuh" />
+    <ClInclude Include="CalculateContactForceTorque.cuh" />
     <ClInclude Include="cuda_mem_utils.h" />
     <ClInclude Include="DEMSolver.h" />
     <ClInclude Include="DeviceStructs.h" />
+    <ClInclude Include="ExternalForceTorque.cuh" />
     <ClInclude Include="HostDataValidator.h" />
     <ClInclude Include="HostStructs.h" />
     <ClInclude Include="Integrate.cuh" />

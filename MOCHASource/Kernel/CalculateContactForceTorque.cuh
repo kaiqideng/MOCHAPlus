@@ -1,5 +1,5 @@
 #pragma once
-#include "neighborSearch.cuh"
+#include "NeighborSearch.cuh"
 
 __device__ __forceinline__ int ParallelBondedContact(double& bondNormalForce, double& bondTorsionalTorque, double3& bondShearForce, double3& bondBendingTorque,
 	double3 contactNormalPrev,
@@ -294,7 +294,3 @@ void wall2Sphere(DeviceData& d, double timeStep, int maxThreadsPerBlock);
 void accumulateForceTorque(DeviceData& d, int maxThreadsPerBlock);
 
 void calculateContactForceTorque(DeviceData& d, double timeStep, int maxThreadsPerBlock, int iStep);
-
-__global__ void calHydroForce(Sphere sph, double3 currentVel, double waterDensity, double waterLevel0, double Cd);
-
-__global__ void calculateGlobalDampingForceTorque(Sphere sph, double globalDampingCoff);

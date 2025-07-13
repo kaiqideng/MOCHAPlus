@@ -6,11 +6,8 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CUDA_STANDARD 14)
 
 # ================================================================
-# Use explicit CUDA compiler if needed
-# set(CMAKE_CUDA_COMPILER /usr/local/cuda-12.8/bin/nvcc)
-
 # Add CUDA include dir so device_launch_parameters.h is found
-include_directories(/usr/local/cuda-12.8/include)
+include_directories(/usr/local/cuda-11.8/include)
 
 # ================================================================
 # Add your own project header folders
@@ -54,4 +51,4 @@ set_target_properties(MOCHA PROPERTIES
 )
 
 # Example: enable fast math if you want
-# target_compile_options(MOCHA PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
+target_compile_options(MOCHA PRIVATE $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>)
