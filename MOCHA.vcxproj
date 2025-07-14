@@ -35,7 +35,7 @@
     <ClCompile Include="DEMSolver.cpp" />
     <ClCompile Include="HostDataValidator.cpp" />
     <ClCompile Include="output.cpp" />
-    <ClCompile Include="Problem.cpp" />
+    <ClCompile Include="ProblemTemplate.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{2A382647-36B6-4369-9D60-27247D2B8980}</ProjectGuid>
