@@ -49,7 +49,7 @@ struct DynamicState {
         cuda_copy(inverseMass, h.inverseMass.data(), size_t(n), CopyDir::H2D);
         cuda_copy(inverseInertia, h.inverseInertia.data(), size_t(n), CopyDir::H2D);
     }
-    void upload(int n, HostDynamicState& h) const
+    void upload(int n, HostDynamicState& h)
     {
         if (n == 0) return;
         cuda_copy(h.positions.data(), positions, size_t(n), CopyDir::D2H);
@@ -61,7 +61,7 @@ struct DynamicState {
         cuda_copy(h.inverseMass.data(), inverseMass, size_t(n), CopyDir::D2H);
         cuda_copy(h.inverseInertia.data(), inverseInertia, size_t(n), CopyDir::D2H);
     }
-    void download(int n, HostDynamicState& h) const
+    void download(int n, HostDynamicState& h)
     {
         if (n == 0) return;
         cuda_copy(positions, h.positions.data(), size_t(n), CopyDir::H2D);
@@ -92,7 +92,7 @@ struct ObjectHash {
         CUDA_FREE(aux); 
         CUDA_FREE(index); 
     }
-    void reset(int n) const
+    void reset(int n)
     {
         CUDA_CHECK(cudaMemset(value, 0xFFFFFFFF, n * sizeof(int)));
         CUDA_CHECK(cudaMemset(aux, 0xFFFFFFFF, n * sizeof(int)));
@@ -130,7 +130,7 @@ struct InteractionRange {
         CUDA_FREE(start); 
         CUDA_FREE(end); 
     }
-    void reset(int n) const
+    void reset(int n)
     {
         CUDA_CHECK(cudaMemset(start, 0xFFFFFFFF, n * sizeof(int)));
         CUDA_CHECK(cudaMemset(end, 0xFFFFFFFF, n * sizeof(int)));
@@ -196,11 +196,11 @@ struct Sphere {
         state.copy(num, h.state);
         cuda_copy(SPHIndex, h.SPHIndex.data(), size_t(num), CopyDir::H2D);
     }
-    void upload(HostSphere& h) const
+    void upload(HostSphere& h)
     {
         state.upload(num, h.state);
     }
-    void download(HostSphere& h) const
+    void download(HostSphere& h)
 	{
 		if (num < h.num) return;
 		state.download(h.num, h.state);
@@ -253,7 +253,7 @@ struct SPH {
         cuda_copy(density, h.density.data(), size_t(num), CopyDir::H2D);
         cuda_copy(pressure, h.pressure.data(), size_t(num), CopyDir::H2D);
     }
-    void upload(HostSPH& h) const
+    void upload(HostSPH& h)
     {
         if (num == 0) return;
         cuda_copy(h.density.data(), density, size_t(num), CopyDir::D2H);
@@ -290,7 +290,7 @@ struct Clump {
         cuda_copy(pebbleEnd, h.pebbleEnd.data(), size_t(num), CopyDir::H2D);
         state.copy(num, h.state);
     }
-    void upload(HostClump& h) const
+    void upload(HostClump& h)
 	{
 		state.upload(num, h.state);
 	}
@@ -455,11 +455,11 @@ struct TriangleWall {
         edge.copy(h.edge);
         vertex.copy(h.vertex);
     }
-    void upload(HostTriangleWall& h) const
+    void upload(HostTriangleWall& h)
     {
         state.upload(num, h.state);
     }
-    void download(HostTriangleWall& h) const
+    void download(HostTriangleWall& h)
     {
         if (num < h.num) return;
         state.download(h.num, h.state);
@@ -674,7 +674,7 @@ struct BondedInteraction {
         release();
         alloc(n);
     }
-    void upload(HostBondedInteraction& h) const
+    void upload(HostBondedInteraction& h)
     {
 		if (num == 0) return;
         if (num > h.num)
@@ -955,7 +955,7 @@ struct SpatialGrid {
         cellSize = h.cellSize;
         gridSize = h.gridSize;
     }
-    void resetCellStartEnd() const
+    void resetCellStartEnd()
     {
         CUDA_CHECK(cudaMemset(cellStart, 0xFFFFFFFF, num * sizeof(int)));
         CUDA_CHECK(cudaMemset(cellEnd, 0xFFFFFFFF, num * sizeof(int)));

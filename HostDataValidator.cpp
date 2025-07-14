@@ -325,6 +325,8 @@ bool validateTriangleWall(const HostTriangleWall& w, int numMaterial)
         {
             if (w.face.vAIndex[i] < 0 || w.face.vBIndex[i] < 0 || w.face.vCIndex[i] < 0)
                 return fail("negative vertex index in face", i);
+            if (w.face.vAIndex[i] == w.face.vBIndex[i] || w.face.vAIndex[i] == w.face.vCIndex[i] || w.face.vBIndex[i] == w.face.vCIndex[i])
+                return fail("repeated vertex index in face", i);
             if (w.face.face2Wall[i] < 0 || w.face.face2Wall[i] >= Nw)
                 return fail("face2Wall out of range", i);
         }
@@ -349,6 +351,8 @@ bool validateTriangleWall(const HostTriangleWall& w, int numMaterial)
     {
         if (w.edge.vAIndex[i] < 0 || w.edge.vBIndex[i] < 0)
             return fail("negative vertex index in edge", i);
+        if (w.edge.vAIndex[i] == w.edge.vBIndex[i])
+            return fail("repeated vertex index in edge", i);
         if (w.edge.edge2Wall[i] < 0 || w.edge.edge2Wall[i] >= Nw)
             return fail("edge2Wall out of range", i);
         if (w.edge.edge2Face[i] < 0 || w.edge.edge2Face[i] >= Nf)

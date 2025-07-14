@@ -128,6 +128,7 @@ void loadTriangleWallInfo(const std::string& file, HostTriangleWall& TW)
     }
 
     //-----------------  Edges -----------------
+	TW.num += nW;
     TW.materialIndex.insert(TW.materialIndex.end(), materialIndex.begin(), materialIndex.end());
 	TW.state.insertData(state);
 	TW.face.num += nF;
