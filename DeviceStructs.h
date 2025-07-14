@@ -49,8 +49,7 @@ struct DynamicState {
         cuda_copy(inverseMass, h.inverseMass.data(), size_t(n), CopyDir::H2D);
         cuda_copy(inverseInertia, h.inverseInertia.data(), size_t(n), CopyDir::H2D);
     }
-
-    void upload(int n, HostDynamicState& h)
+    void upload(int n, HostDynamicState& h) const
     {
         if (n == 0) return;
         cuda_copy(h.positions.data(), positions, size_t(n), CopyDir::D2H);
@@ -62,12 +61,25 @@ struct DynamicState {
         cuda_copy(h.inverseMass.data(), inverseMass, size_t(n), CopyDir::D2H);
         cuda_copy(h.inverseInertia.data(), inverseInertia, size_t(n), CopyDir::D2H);
     }
+    void download(int n, HostDynamicState& h) const
+    {
+        if (n == 0) return;
+        cuda_copy(positions, h.positions.data(), size_t(n), CopyDir::H2D);
+        cuda_copy(orientations, h.orientations.data(), size_t(n), CopyDir::H2D);
+        cuda_copy(velocities, h.velocities.data(), size_t(n), CopyDir::H2D);
+        cuda_copy(angularVelocities, h.angularVelocities.data(), size_t(n), CopyDir::H2D);
+        cuda_copy(forces, h.forces.data(), size_t(n), CopyDir::H2D);
+        cuda_copy(torques, h.torques.data(), size_t(n), CopyDir::H2D);
+        cuda_copy(inverseMass, h.inverseMass.data(), size_t(n), CopyDir::H2D);
+        cuda_copy(inverseInertia, h.inverseInertia.data(), size_t(n), CopyDir::H2D);
+    }
 };
 
 struct ObjectHash {
     int* value{ nullptr };
     int* aux{ nullptr };
     int* index{ nullptr };
+
     void alloc(int n)
     {
         CUDA_ALLOC(value, n, InitMode::NEG_ONE);
@@ -80,7 +92,7 @@ struct ObjectHash {
         CUDA_FREE(aux); 
         CUDA_FREE(index); 
     }
-    void reset(int n)
+    void reset(int n) const
     {
         CUDA_CHECK(cudaMemset(value, 0xFFFFFFFF, n * sizeof(int)));
         CUDA_CHECK(cudaMemset(aux, 0xFFFFFFFF, n * sizeof(int)));
@@ -107,6 +119,7 @@ struct NeighborPrefix {
 struct InteractionRange {
     int* start{ nullptr };
     int* end{ nullptr };
+
     void alloc(int n)
     {
         CUDA_ALLOC(start, n, InitMode::NEG_ONE);
@@ -117,7 +130,7 @@ struct InteractionRange {
         CUDA_FREE(start); 
         CUDA_FREE(end); 
     }
-    void reset(int n)
+    void reset(int n) const
     {
         CUDA_CHECK(cudaMemset(start, 0xFFFFFFFF, n * sizeof(int)));
         CUDA_CHECK(cudaMemset(end, 0xFFFFFFFF, n * sizeof(int)));
@@ -156,7 +169,6 @@ struct Sphere {
 
         CUDA_ALLOC(SPHIndex, n, InitMode::NEG_ONE);
     }
-
     void release()
     {
         CUDA_FREE(clumpIndex);
@@ -173,7 +185,6 @@ struct Sphere {
         CUDA_FREE(SPHIndex);
         num = 0;
     }
-
     void copy(const HostSphere& h)
     {
         release();
@@ -185,15 +196,18 @@ struct Sphere {
         state.copy(num, h.state);
         cuda_copy(SPHIndex, h.SPHIndex.data(), size_t(num), CopyDir::H2D);
     }
-
-    void upload(HostSphere& h)
+    void upload(HostSphere& h) const
     {
         state.upload(num, h.state);
     }
+    void download(HostSphere& h) const
+	{
+		if (num < h.num) return;
+		state.download(h.num, h.state);
+	}
 };
 
-struct SPH
-{
+struct SPH {
     int num{ 0 };
 	double z0{ 0 };
     double H0{ 0 };
@@ -216,7 +230,6 @@ struct SPH
 		CUDA_ALLOC(XSPHVariant, n, InitMode::ZERO);
 		CUDA_ALLOC(SPSStress, n, InitMode::ZERO);
     }
-
     void release()
     {
         CUDA_FREE(density);
@@ -226,7 +239,6 @@ struct SPH
 		CUDA_FREE(SPSStress);
         num = 0;
     }
-
     void copy(const HostSPH& h)
     {
         if (h.num == 0) return;
@@ -241,8 +253,7 @@ struct SPH
         cuda_copy(density, h.density.data(), size_t(num), CopyDir::H2D);
         cuda_copy(pressure, h.pressure.data(), size_t(num), CopyDir::H2D);
     }
-
-    void upload(HostSPH& h)
+    void upload(HostSPH& h) const
     {
         if (num == 0) return;
         cuda_copy(h.density.data(), density, size_t(num), CopyDir::D2H);
@@ -254,7 +265,6 @@ struct Clump {
     int num{ 0 };
     int* pebbleStart{ nullptr };
     int* pebbleEnd{ nullptr };
-
     DynamicState state;
 
     void alloc(int n)
@@ -264,7 +274,6 @@ struct Clump {
         CUDA_ALLOC(pebbleEnd, n, InitMode::NONE);
         state.alloc(n);
     }
-
     void release()
     {
         CUDA_FREE(pebbleStart);
@@ -272,7 +281,6 @@ struct Clump {
         state.release();
         num = 0;
     }
-
     void copy(const HostClump& h)
     {
         if (h.num == 0) return;
@@ -282,6 +290,10 @@ struct Clump {
         cuda_copy(pebbleEnd, h.pebbleEnd.data(), size_t(num), CopyDir::H2D);
         state.copy(num, h.state);
     }
+    void upload(HostClump& h) const
+	{
+		state.upload(num, h.state);
+	}
 };
 
 struct TriangleFace {
@@ -291,6 +303,7 @@ struct TriangleFace {
     int* vCIndex{ nullptr };
     NeighborPrefix neighbor;
     int* face2Wall{ nullptr };
+
     void alloc(int n)
     {
         num = n;
@@ -442,9 +455,14 @@ struct TriangleWall {
         edge.copy(h.edge);
         vertex.copy(h.vertex);
     }
-    void upload(HostTriangleWall& h)
+    void upload(HostTriangleWall& h) const
     {
         state.upload(num, h.state);
+    }
+    void download(HostTriangleWall& h) const
+    {
+        if (num < h.num) return;
+        state.download(h.num, h.state);
     }
 };
 
@@ -509,13 +527,11 @@ struct BasicInteraction {
         CUDA_ALLOC(contactTorque, cap, InitMode::NONE);
         hash.alloc(cap);
     }
-
     void alloc(int cap)
     {
         allocCurr(cap);
         prev.alloc(cap);
     }
-
     void releaseCurr()
     {
         CUDA_FREE(objectPointed); 
@@ -531,13 +547,11 @@ struct BasicInteraction {
         hash.release();
         capacity = num = 0;
     }
-
     void release()
     {
         releaseCurr();
         prev.release();
     }
-
     void copy(const HostBasicInteraction& h)
     {
         release();
@@ -554,7 +568,6 @@ struct BasicInteraction {
         cuda_copy(contactForce, h.contactForce.data(), num, CopyDir::H2D);
         cuda_copy(contactTorque, h.contactTorque.data(), num, CopyDir::H2D);
     }
-
     void upload(HostBasicInteraction& h)
     {
         if (num > h.capacity)
@@ -573,7 +586,6 @@ struct BasicInteraction {
         cuda_copy(h.contactForce.data(), contactForce, num, CopyDir::D2H);
         cuda_copy(h.contactTorque.data(), contactTorque, num, CopyDir::D2H);
     }
-
     void setNum(int nCurrentInteraction)
     {
         if (nCurrentInteraction > capacity)
@@ -583,7 +595,6 @@ struct BasicInteraction {
         }
         num = nCurrentInteraction;
     }
-
     void copy2Prev()
     {
         if (num > prev.capacity)
@@ -599,7 +610,6 @@ struct BasicInteraction {
         cuda_copy(prev.rollingSpring, rollingSpring, num, CopyDir::D2D);
         cuda_copy(prev.torsionSpring, torsionSpring, num, CopyDir::D2D);
     }
-
     void setHash()
     {
         cuda_copy(hash.value, objectPointing, num, CopyDir::D2D);
@@ -644,7 +654,6 @@ struct BondedInteraction {
         CUDA_FREE(bendingTorque); 
         num = 0;
     }
-
 	void copy(const HostBondedInteraction& h)
 	{
 		release();
@@ -660,14 +669,12 @@ struct BondedInteraction {
 		cuda_copy(shearForce, h.shearForce.data(), num, CopyDir::H2D);
 		cuda_copy(bendingTorque, h.bendingTorque.data(), num, CopyDir::H2D);
 	}
-
     void setNumBonds(int n)
     {
         release();
         alloc(n);
     }
-
-    void upload(HostBondedInteraction& h)
+    void upload(HostBondedInteraction& h) const
     {
 		if (num == 0) return;
         if (num > h.num)
@@ -900,6 +907,7 @@ struct BoundaryWall {
     double3* slidingSpring{ nullptr };
     double3* rollingSpring{ nullptr };
     double3* torsionSpring{ nullptr };
+
     void alloc(int n)
     {
         num = n;
@@ -947,7 +955,7 @@ struct SpatialGrid {
         cellSize = h.cellSize;
         gridSize = h.gridSize;
     }
-    void resetCellStartEnd()
+    void resetCellStartEnd() const
     {
         CUDA_CHECK(cudaMemset(cellStart, 0xFFFFFFFF, num * sizeof(int)));
         CUDA_CHECK(cudaMemset(cellEnd, 0xFFFFFFFF, num * sizeof(int)));
@@ -993,18 +1001,6 @@ struct DeviceData
             boundaryWallY.alloc(h.spheres.num);
             boundaryWallZ.alloc(h.spheres.num);
         }
-    }
-
-    void upload(HostData& h)
-    {
-        spheres.upload(h.spheres);
-		SPHParticles.upload(h.SPHParticles);
-        triangleWalls.upload(h.triangleWalls);
-        sphSphInteract.upload(h.sphSphInteract);
-        sphSphBondedInteract.upload(h.sphSphBondedInteract);
-        faceSphInteract.upload(h.faceSphInteract);
-        edgeSphInteract.upload(h.edgeSphInteract);
-        vertexSphInteract.upload(h.vertexSphInteract);
     }
 
     void release()

@@ -24,6 +24,7 @@
     <ClInclude Include="ExternalForceTorque.cuh" />
     <ClInclude Include="HostDataValidator.h" />
     <ClInclude Include="HostStructs.h" />
+    <ClInclude Include="input.h" />
     <ClInclude Include="Integrate.cuh" />
     <ClInclude Include="myQuaternion.h" />
     <ClInclude Include="mySymMatrix.h" />
@@ -34,6 +35,7 @@
   <ItemGroup>
     <ClCompile Include="DEMSolver.cpp" />
     <ClCompile Include="HostDataValidator.cpp" />
+    <ClCompile Include="input.cpp" />
     <ClCompile Include="output.cpp" />
     <ClCompile Include="ProblemTemplate.cpp" />
   </ItemGroup>

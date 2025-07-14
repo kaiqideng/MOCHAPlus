@@ -73,9 +73,7 @@ void writeSpheresVTU(const std::string& fileName, const HostSphere& s,
         const std::vector<double3>& vec;
     } vec3s[] = {
         { "velocity"       , s.state.velocities        },
-        { "angularVelocity", s.state.angularVelocities },
-        { "force"          , s.state.forces            },
-        { "torque"         , s.state.torques           }
+        { "angularVelocity", s.state.angularVelocities }
     };
     for (size_t k = 0; k < sizeof(vec3s) / sizeof(vec3s[0]); ++k) {
         out << "        <DataArray type=\"Float32\" Name=\"" << vec3s[k].name
@@ -569,7 +567,19 @@ void writeSPHSpheresVTU(const std::string& fileName, const HostSPH& SPHP, const 
     if (!out) throw std::runtime_error("Cannot open " + fname.str());
 
     out << std::fixed << std::setprecision(7);      // full double precision
-    const int N = SPHP.num;
+
+    int N = 0;
+    std::vector<double> rad;
+    std::vector<double3> pos, vel;
+    for (int i = 0; i < s.num; ++i) {
+        if (s.SPHIndex[i] >= 0)
+        {
+            rad.push_back(s.radii[i]);
+            pos.push_back(s.state.positions[i]);
+            vel.push_back(s.state.velocities[i]);
+            N++;
+        }
+    }
 
     /* ============ XML HEADER ============ */
     out << "<?xml version=\"1.0\"?>\n"
@@ -591,9 +601,8 @@ void writeSPHSpheresVTU(const std::string& fileName, const HostSPH& SPHP, const 
     /* ---- Points ---- */
     out << "      <Points>\n"
         "        <DataArray type=\"Float32\" NumberOfComponents=\"3\" format=\"ascii\">\n";
-    for (int i = 0; i < s.num; ++i) {
-        if (s.SPHIndex[i] < 0) continue;
-        const double3& p = s.state.positions[i];
+    for (int i = 0; i < N; ++i) {
+        const double3& p = pos[i];
         out << ' ' << p.x << ' ' << p.y << ' ' << p.z;
     }
     out << "\n        </DataArray>\n"
@@ -618,9 +627,8 @@ void writeSPHSpheresVTU(const std::string& fileName, const HostSPH& SPHP, const 
     /* helper lambdas replaced by small inline fns (C++03 safe) */
     {   /* scalar double array */
         out << "        <DataArray type=\"Float32\" Name=\"radius\" format=\"ascii\">\n";
-        for (size_t i = 0; i < s.radii.size(); ++i) {
-            if (s.SPHIndex[i] < 0) continue;
-            out << ' ' << s.radii[i];
+        for (size_t i = 0; i < N; ++i) {
+            out << ' ' << rad[i];
         }
         out << "\n        </DataArray>\n";
     }
@@ -629,14 +637,13 @@ void writeSPHSpheresVTU(const std::string& fileName, const HostSPH& SPHP, const 
         const char* name;
         const std::vector<double3>& vec;
     } vec3s[] = {
-        { "velocity"       , s.state.velocities        }
+        { "velocity"       , vel        }
     };
     for (size_t k = 0; k < sizeof(vec3s) / sizeof(vec3s[0]); ++k) {
         out << "        <DataArray type=\"Float32\" Name=\"" << vec3s[k].name
             << "\" NumberOfComponents=\"3\" format=\"ascii\">\n";
         const std::vector<double3>& v = vec3s[k].vec;
         for (size_t i = 0; i < v.size(); ++i) {
-            if (s.SPHIndex[i] < 0) continue;
             out << ' ' << v[i].x << ' ' << v[i].y << ' ' << v[i].z;
         }
         out << "\n        </DataArray>\n";
@@ -644,13 +651,15 @@ void writeSPHSpheresVTU(const std::string& fileName, const HostSPH& SPHP, const 
 
     out << "        <DataArray type=\"Float32\" Name=\"density\" format=\"ascii\">\n";
     for (size_t i = 0; i < N; ++i) {
-        out << ' ' << SPHP.density[i];
+		int index = s.SPHIndex[i];
+        out << ' ' << SPHP.density[index];
     }
     out << "\n        </DataArray>\n";
 
     out << "        <DataArray type=\"Float32\" Name=\"pressure\" format=\"ascii\">\n";
     for (size_t i = 0; i < N; ++i) {
-        out << ' ' << SPHP.pressure[i];
+		int index = s.SPHIndex[i];
+        out << ' ' << SPHP.pressure[index];
     }
     out << "\n        </DataArray>\n";
 

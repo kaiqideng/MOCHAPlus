@@ -1,19 +1,5 @@
 #include "NeighborSearch.cuh"
 
-inline void computeGPUParameter(int& gridSize, int& blockSize,
-    int nElements,
-    int maxThreadsPerBlock)
-{
-    if (nElements == 0)
-    {
-        gridSize = int(1);
-        blockSize = int(1);
-        return;
-    }
-    blockSize = maxThreadsPerBlock < nElements ? maxThreadsPerBlock : nElements;
-    gridSize = (nElements + blockSize - 1) / blockSize;
-}
-
 void sortKeyValuePairs(int* keys, int* values, int num)
 {
     if (num < 1) return;

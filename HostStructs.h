@@ -2,51 +2,7 @@
 #include "mySymMatrix.h"
 #include <vector>
 #include <algorithm>
-#include <fstream>
-#include <sstream>
 #include <unordered_map>
-#include <utility>
-#include <string>
-#include <tuple>
-#include <cctype>
-#include <iomanip>
-#include <iostream>
-
-static inline void ltrim(std::string& s)
-{
-    size_t i = 0;
-    while (i < s.size() && std::isspace(static_cast<unsigned char>(s[i]))) ++i;
-    s.erase(0, i);
-}
-
-static bool getlineValid(std::ifstream& fin, std::string& line)
-{
-    while (std::getline(fin, line))
-    {
-        ltrim(line);
-        if (line.empty() || line[0] == '#') continue;
-        return true;
-    }
-    return false;
-}
-
-static int countValidNumbersStrict(const std::string& line)
-{
-    std::istringstream iss(line);
-    std::string token;
-    int count = 0;
-    while (iss >> token) 
-    {
-        std::istringstream tokStream(token);
-        double d;
-        char c;
-        if (tokStream >> d && !(tokStream >> c)) 
-        {
-            ++count;
-        }
-    }
-    return count;
-}
 
 struct HostDynamicState
 {
@@ -180,12 +136,12 @@ struct HostSphere
         if (N <= 0) return;
 		HostSphere sph(N);
 
-		double SXmax = double(2. * numPX - 1 + 2) * dx / 2. + sphereRadius;
-        double SYmax = double(2. * numPY - 1 + 2. / 3.) * dy / 2. + (1. / sqrt(3.) - 0.5) * dy + sphereRadius;
-		double SZmax = 0.5 * (spacing - dz) + (2. * numPZ - 1.) * dz / 2. + sphereRadius;
-		origin.x += (sampleSize.x > SXmax) * (sampleSize.x - SXmax) / 2.;
-        origin.y += (sampleSize.y > SYmax) * (sampleSize.y - SYmax) / 2.;
-        origin.z += (sampleSize.z > SZmax) * (sampleSize.z - SZmax) / 2.;
+		double SXMax = double(2. * numPX - 1 + 2) * dx / 2. + sphereRadius;
+        double SYMax = double(2. * numPY - 1 + 2. / 3.) * dy / 2. + (1. / sqrt(3.) - 0.5) * dy + sphereRadius;
+		double SZMax = 0.5 * (spacing - dz) + (2. * numPZ - 1.) * dz / 2. + sphereRadius;
+		origin.x += (sampleSize.x > SXMax) * (sampleSize.x - SXMax) / 2.;
+        origin.y += (sampleSize.y > SYMax) * (sampleSize.y - SYMax) / 2.;
+        origin.z += (sampleSize.z > SZMax) * (sampleSize.z - SZMax) / 2.;
         
         int count = 0;
         for (int x = 1; x <= numPX; x++)
@@ -397,6 +353,7 @@ struct HostTriangleEdge
     std::vector<int> vBIndex;
     std::vector<int> edge2Wall;
     std::vector<int> facePrefixSum;
+
 	HostTriangleEdge() = default;
     explicit HostTriangleEdge(int n)
     {
@@ -406,6 +363,7 @@ struct HostTriangleEdge
         edge2Wall.resize(n, 0);
         facePrefixSum.resize(n, 0);
     }
+
     std::vector<int> edge2Face;
 };
 
@@ -537,148 +495,6 @@ struct HostTriangleWall
         {
             for (int f : v2Face[v]) vertex.vertex2Face[cf++] = f;
             for (int e : v2Edge[v]) vertex.vertex2Edge[ce++] = e;
-        }
-    }
-
-    bool loadTriangleWallInfo(const std::string& file)
-    {
-        std::ifstream fin(file);
-        if (!fin) { std::cerr << "Cannot open " << file << '\n'; return false; }
-        std::string line, key;
-
-        //-----------------  Walls -----------------
-        if (!getlineValid(fin, line)) return false;
-        if (countValidNumbersStrict(line) != 1)
-        {
-            std::cerr << "Invalid WALLS header format: " << line << '\n';
-            return false;
-        }
-        int nW = 0;
-        std::istringstream w0(line);
-        w0 >> key >> nW;
-        if (key != "WALLS")
-        {
-            std::cerr << "Need 'WALLS' header\n";
-            return false;
-        }
-		if (nW <= 0)
-		{
-			std::cerr << "Number of walls must be positive\n";
-			return false;
-		}
-        num = nW;
-        materialIndex.resize(nW);
-        state = HostDynamicState(nW);
-        for (int i = 0; i < nW; ++i)
-        {
-			if (!getlineValid(fin, line))
-			{
-				std::cerr << "Missing wall lines\n";
-				return false;
-			}
-			if (countValidNumbersStrict(line) != 9)
-			{
-				std::cerr << "Invalid wall line format: " << line << '\n';
-				return false;
-			}
-            int id = 0, mat = 0; double3 pos = make_double3(0, 0, 0); quaternion q = make_quaternion(1, 0, 0, 0);
-            std::istringstream wl(line);
-            wl >> id >> mat
-                >> pos.x >> pos.y >> pos.z
-                >> q.q0 >> q.q1 >> q.q2 >> q.q3;
-			if (id < 0 || id >= nW)
-			{
-				std::cerr << "Wall ID out of range: " << id << '\n';
-				return false;
-			}
-            materialIndex[id] = mat;
-            state.positions[id] = pos;
-            state.orientations[id] = q;
-        }
-
-        //-----------------  Vertices -----------------
-        if (!getlineValid(fin, line)) return false;
-		if (countValidNumbersStrict(line) != 1)
-		{
-			std::cerr << "Invalid VERTICES header format: " << line << '\n';
-			return false;
-		}
-        int nV = 0;
-        std::istringstream v0(line);
-        v0 >> key >> nV;            // key == "VERTICES"
-        if (key != "VERTICES")
-        {
-            std::cerr << "Need 'VERTICES' header\n";
-            return false;
-        }
-		if (nV <= 0) 
-        { 
-            std::cerr << "Number of vertices must be positive\n";
-            return false; 
-        }
-		vertex = HostTriangleVertex(nV);
-        for (int v = 0; v < nV; ++v)
-        {
-            if (!getlineValid(fin, line)) return false;
-			if (countValidNumbersStrict(line) != 4)
-			{
-				std::cerr << "Invalid vertex line format: " << line << '\n';
-				return false;
-			}
-            std::istringstream vl(line);
-            vl >> vertex.positions[v].x
-                >> vertex.positions[v].y
-                >> vertex.positions[v].z
-                >> vertex.vertex2Wall[v];
-        }
-
-        //-----------------  Faces -----------------
-        if (!getlineValid(fin, line)) return false;
-        if (countValidNumbersStrict(line) != 1)
-		{
-			std::cerr << "Invalid FACES header format: " << line << '\n';
-			return false;
-		}
-        int nF = 0;
-        std::istringstream f0(line);
-        f0 >> key >> nF;            // key == "FACES"
-        if (key != "FACES")
-        {
-            std::cerr << "Need 'FACES' header\n";
-            return false;
-        }
-        if (nF <= 0)
-        { 
-            std::cerr << "Number of faces must be positive\n"; 
-            return false; 
-        }
-		face = HostTriangleFace(nF);
-        for (int f = 0; f < nF; ++f)
-        {
-            if (!getlineValid(fin, line)) return false;
-			if (countValidNumbersStrict(line) != 4)
-			{
-				std::cerr << "Invalid face line format: " << line << '\n';
-				return false;
-			}
-            std::istringstream fl(line);
-            fl >> face.vAIndex[f]
-                >> face.vBIndex[f]
-                >> face.vCIndex[f]
-                >> face.face2Wall[f];
-        }
-
-        //-----------------  Edges -----------------
-		loadEdgeInfo();
-        return true;
-    }
-
-    explicit HostTriangleWall(const std::string& file)
-    {
-        if (!loadTriangleWallInfo(file))
-        {
-            std::cerr << "Failed to load triangle wall info from " << file << '\n';
-            num = 0;
         }
     }
 
@@ -1017,191 +833,6 @@ struct HostContactParameter
         }
         int index = (i * (2 * material.num - i + 1)) / 2 + j - i;
         return index;
-    }
-
-    bool loadContactParameterInfo(const std::string& file)
-    {
-        std::ifstream fin(file);
-        if (!fin) { std::cerr << "cannot open " << file << '\n'; return false; }
-        std::string line, key;
-        if (!getlineValid(fin, line)) return false;
-        if (countValidNumbersStrict(line) != 1)
-        {
-            std::cerr << "Invalid header format: " << line << '\n';
-            return false;
-        }
-        std::istringstream head0(line);
-        int m = 0;
-        head0 >> key >> m;
-        /* -------------------------------------------------- */
-        /*  MATERIAL                                       */
-        /* -------------------------------------------------- */
-        if (key == "MATERIAL")
-        {
-            material.num = m;
-            material.elasticModulus.resize(m, 0.);
-            material.poissonRatio.resize(m, 0.);
-
-            for (int k = 0; k < m; ++k)
-            {
-                getlineValid(fin, line);
-                std::istringstream is(line);
-                if (countValidNumbersStrict(line) != 3)
-                {
-                    std::cerr << "Invalid material line format: " << line << '\n';
-                    return false;
-                }
-                int id = 0;
-                is  >> id
-                    >> material.elasticModulus[id]
-                    >> material.poissonRatio[id];
-            }
-        }
-        else
-        {
-            std::cerr << "Need 'MATERIAL' header firstly\n";
-            return false;
-        }
-
-        int nC = m * (m + 1) / 2; // number of contact pairs
-        Hertzian.num = nC;
-        Hertzian.kR_to_kS_ratio.resize(nC, 1.);
-        Hertzian.kT_to_kS_ratio.resize(nC, 1.);
-        Hertzian.restitution.resize(nC, 1.);
-        Hertzian.friction.normal.resize(nC, 0.);
-        Hertzian.friction.sliding.resize(nC, 0.);
-        Hertzian.friction.rolling.resize(nC, 0.);
-        Hertzian.friction.torsion.resize(nC, 0.);
-        Linear.num = nC;
-        Linear.stiffness.normal.resize(nC, 0.);
-        Linear.stiffness.sliding.resize(nC, 0.);
-        Linear.stiffness.rolling.resize(nC, 0.);
-        Linear.stiffness.torsion.resize(nC, 0.);
-        Linear.dissipation.normal.resize(nC, 0.);
-        Linear.dissipation.sliding.resize(nC, 0.);
-        Linear.dissipation.rolling.resize(nC, 0.);
-        Linear.dissipation.torsion.resize(nC, 0.);
-        Linear.friction.normal.resize(nC, 0.);
-        Linear.friction.sliding.resize(nC, 0.);
-        Linear.friction.rolling.resize(nC, 0.);
-        Linear.friction.torsion.resize(nC, 0.);
-        Bond.num = nC;
-        Bond.maxContactGap.resize(nC, 0.);
-        Bond.multiplier.resize(nC, 1.);
-        Bond.elasticModulus.resize(nC, 0.);
-        Bond.kN_to_kS_ratio.resize(nC, 1.);
-        Bond.tensileStrength.resize(nC, 0.);
-        Bond.cohesion.resize(nC, 0.);
-        Bond.frictionCoeff.resize(nC, 0.);
-        Bond.criticalDamping.resize(nC, 0.);
-
-        while (getlineValid(fin, line))
-        {
-            std::istringstream head1(line);
-            head1 >> key;
-            /* -------------------------------------------------- */
-            /*  1. HERTZIAN                                       */
-            /* -------------------------------------------------- */
-            if (key == "HERTZIAN")
-            {
-                while (getlineValid(fin, line) && line != "END")
-                {
-                    if (countValidNumbersStrict(line) != 8)
-                    {
-                        std::cerr << "Invalid Hertzian line format: " << line << '\n';
-                        return false;
-                    }
-                    std::istringstream is(line);
-                    int i, j; double rs, ts, res, mus, mur, mut;
-                    is >> i >> j >> rs >> ts >> res >> mus >> mur >> mut;
-                    if (i >= material.num || j >= material.num)
-                    {
-						std::cerr << "Hertzian Contact: Material index out of range" << '\n';
-						return false;
-                    }
-                    int idx = getContactParameterIndex(i, j);
-                    Hertzian.kR_to_kS_ratio[idx] = rs;
-                    Hertzian.kT_to_kS_ratio[idx] = ts;
-                    Hertzian.restitution[idx] = res;
-                    Hertzian.friction.sliding[idx] = mus;
-                    Hertzian.friction.rolling[idx] = mur;
-                    Hertzian.friction.torsion[idx] = mut;
-                }
-            }
-
-            /* -------------------------------------------------- */
-            /*  2. LINEAR  (kR/kT  cR/cT)                      */
-            /* -------------------------------------------------- */
-            else if (key == "LINEAR")
-            {
-                while (getlineValid(fin, line) && line != "END")
-                {
-                    if (countValidNumbersStrict(line) != 13)
-                    {
-                        std::cerr << "Invalid Linear line format: " << line << '\n';
-                        return false;
-                    }
-                    std::istringstream is(line);
-                    int i, j; double kN, kS, kR, kT, cN, cS, cR, cT, mus, mur, mut;
-                    is >> i >> j
-                        >> kN >> kS >> kR >> kT
-                        >> cN >> cS >> cR >> cT
-                        >> mus >> mur >> mut;
-                    if (i >= material.num || j >= material.num)
-                    {
-                        std::cerr << "Linear Contact: Material index out of range" << '\n';
-                        return false;
-                    }
-                    int idx = getContactParameterIndex(i, j);
-                    Linear.stiffness.normal[idx] = kN;
-                    Linear.stiffness.sliding[idx] = kS;
-                    Linear.stiffness.rolling[idx] = kR;
-                    Linear.stiffness.torsion[idx] = kT;
-
-                    Linear.dissipation.normal[idx] = cN;
-                    Linear.dissipation.sliding[idx] = cS;
-                    Linear.dissipation.rolling[idx] = cR;
-                    Linear.dissipation.torsion[idx] = cT;
-
-                    Linear.friction.sliding[idx] = mus;
-                    Linear.friction.rolling[idx] = mur;
-                    Linear.friction.torsion[idx] = mut;
-                }
-            }
-
-            /* -------------------------------------------------- */
-            /*  3. BONDED                                         */
-            /* -------------------------------------------------- */
-            else if (key == "BONDED")
-            {
-                while (getlineValid(fin, line) && line != "END")
-                {
-                    if (countValidNumbersStrict(line) != 10)
-                    {
-                        std::cerr << "Invalid Bonded line format: " << line << '\n';
-                        return false;
-                    }
-                    std::istringstream is(line);
-                    int i, j; double d, mult, E, ratio, tens, coh, mu, gama;
-                    is >> i >> j >> d >> mult >> E >> ratio >> tens >> coh >> mu >> gama;
-                    if (i >= material.num || j >= material.num)
-                    {
-                        std::cerr << "Bonded Contact: Material index out of range" << '\n';
-                        return false;
-                    }
-                    int idx = getContactParameterIndex(i, j);
-                    Bond.maxContactGap[idx] = d;
-                    Bond.multiplier[idx] = mult;
-                    Bond.elasticModulus[idx] = E;
-                    Bond.kN_to_kS_ratio[idx] = ratio;
-                    Bond.tensileStrength[idx] = tens;
-                    Bond.cohesion[idx] = coh;
-                    Bond.frictionCoeff[idx] = mu;
-                    Bond.criticalDamping[idx] = gama;
-                }
-            }
-        }
-        return true;
     }
 };
 

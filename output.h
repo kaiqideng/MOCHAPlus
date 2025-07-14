@@ -1,5 +1,5 @@
 #pragma once
-#include "HostStructs.h"
+#include "input.h"
 
 #ifdef _WIN32
 #include <io.h>

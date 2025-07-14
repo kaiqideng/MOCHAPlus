@@ -1,5 +1,6 @@
 #pragma once
 #include "CalculateContactForceTorque.cuh"
+#include "ExternalForceTorque.cuh"
 
 __global__ void integrateBeforeContactCalculation(DynamicState state, double3 gravity, double timeStep, int num);
 

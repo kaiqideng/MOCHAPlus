@@ -6,6 +6,20 @@
 #include "DeviceStructs.h"
 constexpr auto EPS_DOT = 1e-10;
 
+inline void computeGPUParameter(int& gridSize, int& blockSize,
+    int nElements,
+    int maxThreadsPerBlock)
+{
+    if (nElements == 0)
+    {
+        gridSize = int(1);
+        blockSize = int(1);
+        return;
+    }
+    blockSize = maxThreadsPerBlock < nElements ? maxThreadsPerBlock : nElements;
+    gridSize = (nElements + blockSize - 1) / blockSize;
+}
+
 void computeGPUParameter(int& grid, int& block, int nElements, int maxThreadsPerBlock);
 
 void sortKeyValuePairs(int* keys, int* values, int num);
