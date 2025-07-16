@@ -53,6 +53,4 @@ bool validateClumpData(const HostClump& clumps, int numSphere);
 
 bool validateTriangleWall(const HostTriangleWall& w, int numMaterial);
 
-bool validateSimulationParameter(const HostSimulationParameter& p, int numMaterial);
-
 bool validateHostData(const HostData& h);

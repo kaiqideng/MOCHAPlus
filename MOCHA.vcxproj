@@ -19,7 +19,7 @@
   <ItemGroup>
     <ClInclude Include="CalculateContactForceTorque.cuh" />
     <ClInclude Include="cuda_mem_utils.h" />
-    <ClInclude Include="DEMSolver.h" />
+    <ClInclude Include="Solver.h" />
     <ClInclude Include="DeviceStructs.h" />
     <ClInclude Include="ExternalForceTorque.cuh" />
     <ClInclude Include="HostDataValidator.h" />
@@ -33,7 +33,7 @@
     <ClInclude Include="output.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="DEMSolver.cpp" />
+    <ClCompile Include="Solver.cpp" />
     <ClCompile Include="HostDataValidator.cpp" />
     <ClCompile Include="input.cpp" />
     <ClCompile Include="output.cpp" />

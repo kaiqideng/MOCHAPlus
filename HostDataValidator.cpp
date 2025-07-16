@@ -2,26 +2,26 @@
 
 bool validateContactParameter(const HostContactParameter& cp)
 {
-    std::cout << "Validating ContactParameter data ......\n";
+    std::cout << "       Validating ContactParameter data ......\n";
 
     const int Nm = cp.material.num;
     if (Nm <= 0)
     {
-        std::cerr << "ContactParameter: material.num must be positive\n";
+        std::cerr << "       ContactParameter: material.num must be positive\n";
         return false;
     }
 
     if ((int)cp.material.elasticModulus.size() != Nm ||
         (int)cp.material.poissonRatio.size() != Nm)
-        return fail("contactPara.material length");
+        return fail("       contactPara.material length");
 
     for (int i = 0; i < Nm; ++i)
     {
         double E = cp.material.elasticModulus[i];
-        if (!(E >= 0 && isFinite(E)))                            return fail("material.elasticModulus", i);
+        if (!(E >= 0 && isFinite(E))) return fail("       material.elasticModulus", i);
 
         double v = cp.material.poissonRatio[i];
-        if (!(v > -1.0 && v < 1.0 && isFinite(v)))              return fail("material.poissonRatio", i);
+        if (!(v > -1.0 && v < 1.0 && isFinite(v))) return fail("       material.poissonRatio", i);
     }
 
     /* --- Hertzian --- */
@@ -29,8 +29,8 @@ bool validateContactParameter(const HostContactParameter& cp)
     if ((int)cp.Hertzian.kR_to_kS_ratio.size() != Nh ||
         (int)cp.Hertzian.kT_to_kS_ratio.size() != Nh ||
         (int)cp.Hertzian.restitution.size() != Nh)
-        return fail("contactPara.Hertzian length");
-    if (!checkDirectional(cp.Hertzian.friction, Nh, "Hertzian.friction"))
+        return fail("       contactPara.Hertzian length");
+    if (!checkDirectional(cp.Hertzian.friction, Nh, "       Hertzian.friction"))
         return false;
 
     for (int i = 0; i < Nh; ++i)
@@ -38,16 +38,16 @@ bool validateContactParameter(const HostContactParameter& cp)
         double r1 = cp.Hertzian.kR_to_kS_ratio[i];
         double r2 = cp.Hertzian.kT_to_kS_ratio[i];
         double e = cp.Hertzian.restitution[i];
-        if (!(r1 >= 0 && isFinite(r1)))                         return fail("Hertzian.kR_to_kS_ratio", i);
-        if (!(r2 >= 0 && isFinite(r2)))                         return fail("Hertzian.kT_to_kS_ratio", i);
-        if (!(e > 0 && e <= 1 && isFinite(e)))                return fail("Hertzian.restitution", i);
+        if (!(r1 >= 0 && isFinite(r1))) return fail("       Hertzian.kR_to_kS_ratio", i);
+        if (!(r2 >= 0 && isFinite(r2))) return fail("       Hertzian.kT_to_kS_ratio", i);
+        if (!(e > 0 && e <= 1 && isFinite(e))) return fail("       Hertzian.restitution", i);
     }
 
     /* --- Linear --- */
     const int Nl = cp.Linear.num;
-    if (!checkDirectional(cp.Linear.stiffness, Nl, "Linear.stiffness")) return false;
-    if (!checkDirectional(cp.Linear.dissipation, Nl, "Linear.dissipation")) return false;
-    if (!checkDirectional(cp.Linear.friction, Nl, "Linear.friction")) return false;
+    if (!checkDirectional(cp.Linear.stiffness, Nl, "       Linear.stiffness")) return false;
+    if (!checkDirectional(cp.Linear.dissipation, Nl, "       Linear.dissipation")) return false;
+    if (!checkDirectional(cp.Linear.friction, Nl, "       Linear.friction")) return false;
 
     /* --- Bonded --- */
     const int Nb = cp.Bond.num;
@@ -58,33 +58,33 @@ bool validateContactParameter(const HostContactParameter& cp)
         (int)cp.Bond.tensileStrength.size() != Nb ||
         (int)cp.Bond.cohesion.size() != Nb ||
         (int)cp.Bond.frictionCoeff.size() != Nb)
-        return fail("contactPara.Bond length");
+        return fail("       contactPara.Bond length");
 
     for (int i = 0; i < Nb; ++i)
     {
         if (!(cp.Bond.maxContactGap[i] >= 0 && isFinite(cp.Bond.maxContactGap[i])))
-            return fail("Bond.maxContactGap", i);
+            return fail("       Bond.maxContactGap", i);
         if (!(cp.Bond.multiplier[i] > 0 && isFinite(cp.Bond.multiplier[i])))
-            return fail("Bond.multiplier", i);
+            return fail("       Bond.multiplier", i);
         if (!(cp.Bond.elasticModulus[i] >= 0 && isFinite(cp.Bond.elasticModulus[i])))
-            return fail("Bond.elasticModulus", i);
+            return fail("       Bond.elasticModulus", i);
         if (!(cp.Bond.kN_to_kS_ratio[i] > 0 && isFinite(cp.Bond.kN_to_kS_ratio[i])))
-            return fail("Bond.kN_to_kS_ratio", i);
+            return fail("       Bond.kN_to_kS_ratio", i);
         if (!(cp.Bond.tensileStrength[i] >= 0 && isFinite(cp.Bond.tensileStrength[i])))
-            return fail("Bond.tensileStrength", i);
+            return fail("       Bond.tensileStrength", i);
         if (!(cp.Bond.cohesion[i] >= 0 && isFinite(cp.Bond.cohesion[i])))
-            return fail("Bond.cohesion", i);
+            return fail("       Bond.cohesion", i);
         if (!(cp.Bond.frictionCoeff[i] >= 0 && isFinite(cp.Bond.frictionCoeff[i])))
-            return fail("Bond.frictionCoeff", i);
+            return fail("       Bond.frictionCoeff", i);
     }
 
-    std::cout << "ContactParameter data check PASSED\n";
+    std::cout << "       ContactParameter data check PASSED\n";
     return true;
 }
 
 bool validateSpatialGrid(const HostSpatialGrid& g)
 {
-    std::cout << "Validating SpatialGrid data ......\n";
+    std::cout << "       Validating SpatialGrid data ......\n";
 
     if (!isFinite3(g.minBound) || !isFinite3(g.maxBound) || !isFinite3(g.cellSize))
     {
@@ -128,14 +128,14 @@ bool validateSpatialGrid(const HostSpatialGrid& g)
         std::cerr << "Grid: num != gridSize.x*y*z + 1\n"; return false;
     }
 
-    std::cout << "SpatialGrid check PASSED\n";
+    std::cout << "       SpatialGrid check PASSED\n";
     return true;
 }
 
 bool validateSphereData(const HostSphere& sph, double3 minBound, double3 maxBound, const int numClump, const int numSPH, int numMaterial)
 {
     const int n = sph.num;
-    std::cout << "Validating Sphere data ......\n";
+    std::cout << "       Validating Sphere data ......\n";
 
 #define SIZECHK(vec,name)  if((int)(vec).size()!=n) return fail("size mismatch: "#name);
     SIZECHK(sph.clumpIndex, clumpIndex)
@@ -194,9 +194,10 @@ bool validateSphereData(const HostSphere& sph, double3 minBound, double3 maxBoun
             if (sph.materialIndex[i] < 0 || sph.materialIndex[i] >= numMaterial) return fail("materialIndex out of range", i);
             if (sph.clumpIndex[i] >= numClump) return fail("clumpIndex out of range", i);
             if (sph.SPHIndex[i] >= numSPH) return fail("SPHIndex out of range", i);
+            if (sph.SPHIndex[i] >= 0 && sph.clumpIndex[i] >= 0) return fail("wrong property", i);
         }
 
-    std::cout << "Sphere check PASSED\n";
+    std::cout << "       Sphere check PASSED\n";
     return true;
 }
 
@@ -204,7 +205,7 @@ bool validateSPHData(const HostSPH& SPHP)
 {
     const int n = SPHP.num;
     if (n == 0) return true;
-    std::cout << "Validating SPH data ......\n";
+    std::cout << "       Validating SPH data ......\n";
 #define SIZECHK(vec,name)  if((int)(vec).size()!=n) return fail("size mismatch: "#name);
     SIZECHK(SPHP.density, density)
         SIZECHK(SPHP.pressure, pressure)
@@ -238,7 +239,7 @@ bool validateSPHData(const HostSPH& SPHP)
         if (!isFinite(SPHP.density[i]) || SPHP.density[i] < 0)
             return fail("density", i);
     }
-    std::cout << "SPH data check PASSED\n";
+    std::cout << "       SPH data check PASSED\n";
     return true;
 }
 
@@ -246,7 +247,7 @@ bool validateClumpData(const HostClump& clumps, int numSphere)
 {
     const int n = clumps.num;
     if (n == 0) return true;
-    std::cout << "Validating Clump data ......\n";
+    std::cout << "       Validating Clump data ......\n";
 #define SIZECHK(vec,name)  if((int)(vec).size()!=n) return fail("size mismatch: "#name);
     SIZECHK(clumps.pebbleStart, pebbleStart)
         SIZECHK(clumps.pebbleEnd, pebbleEnd)
@@ -258,7 +259,7 @@ bool validateClumpData(const HostClump& clumps, int numSphere)
             if (clumps.pebbleStart[i] >= numSphere || clumps.pebbleEnd[i] >= numSphere)
                 return fail("pebbleStart/End out of range", i);
         }
-    std::cout << "Clump data check PASSED\n";
+    std::cout << "       Clump data check PASSED\n";
     return true;
 }
 
@@ -266,7 +267,7 @@ bool validateTriangleWall(const HostTriangleWall& w, int numMaterial)
 {
     const int Nw = w.num;
     if (Nw == 0) return true;
-    std::cout << "Validating TriangleWall data ......\n";
+    std::cout << "       Validating TriangleWall data ......\n";
 
     /* =============== Wall-level =============== */
 #define SIZECHK(vec,name)  if((int)(vec).size()!=Nw) return fail("size mismatch: "#name);
@@ -395,59 +396,7 @@ bool validateTriangleWall(const HostTriangleWall& w, int numMaterial)
             return fail("vertex.edgePrefixSum", i);
     }
 
-    std::cout << "TriangleWall check PASSED\n";
-    return true;
-}
-
-bool validateSimulationParameter(const HostSimulationParameter& p, int numMaterial)
-{
-    std::cout << "Validating SimulationParameter data ......\n";
-    if (!isFinite3(p.domainOrigin)) { std::cerr << "domainOrigin NaN/Inf\n"; return false; }
-    if (!isFinite3(p.domainSize)) { std::cerr << "domainSize   NaN/Inf\n"; return false; }
-    if (!isFinite3(p.gravity)) { std::cerr << "gravity      NaN/Inf\n"; return false; }
-
-    if (p.domainSize.x <= 0 || p.domainSize.y <= 0 || p.domainSize.z <= 0)
-    {
-        std::cerr << "domainSize components must be >0\n"; return false;
-    }
-
-    if (p.boundaryWallMaterialIndex < 0 || p.boundaryWallMaterialIndex >= numMaterial)
-    {
-        std::cerr << "boundaryWallMaterialIndex out of range\n"; return false;
-    }
-
-    if (!(p.timeMax > 0 && std::isfinite(p.timeMax)))
-    {
-        std::cerr << "timeMax must be >0 & finite\n"; return false;
-    }
-
-    if (!(p.timeStep > 0 && std::isfinite(p.timeStep) && p.timeStep < p.timeMax))
-    {
-        std::cerr << "timeStep must be >0, finite, and < timeMax\n"; return false;
-    }
-
-    if (p.nPrint <= 0)
-    {
-        std::cerr << "nPrint must be >0\n"; return false;
-    }
-
-    if (p.maxThreadsPerBlock <= 0)
-    {
-        std::cerr << "maxThreadsPerBlock must be >0\n"; return false;
-    }
-
-    if (p.deviceNumber < 0)
-    {
-        std::cerr << "deviceNumber must be >=0\n"; return false;
-    }
-
-    int deviceCount = 0;
-    if (cudaGetDeviceCount(&deviceCount) == cudaSuccess && p.deviceNumber >= deviceCount)
-    {
-        std::cerr << "deviceNumber out of range (have " << deviceCount << " devices)\n"; return false;
-    }
-
-    std::cout << "SimulationParameter check PASSED\n";
+    std::cout << "       TriangleWall check PASSED\n";
     return true;
 }
 
@@ -466,8 +415,6 @@ bool validateHostData(const HostData& h)
     pass = validateClumpData(h.clumps, h.spheres.num);
     if (!pass) return false;
     pass = validateTriangleWall(h.triangleWalls, h.contactPara.material.num);
-    if (!pass) return false;
-    pass = validateSimulationParameter(h.simulation, h.contactPara.material.num);
     if (!pass) return false;
     return true;
 }

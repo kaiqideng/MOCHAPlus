@@ -14,7 +14,9 @@ struct HostDynamicState
     std::vector<double3>  torques;
     std::vector<double>   inverseMass;
     std::vector<symMatrix> inverseInertia;
+
 	HostDynamicState() = default;
+
     explicit HostDynamicState(int n)
     {
         positions.resize(n, make_double3(0., 0., 0.));
@@ -48,7 +50,9 @@ struct HostSphere
     std::vector<double> radii;
     HostDynamicState state;
     std::vector<int> SPHIndex;
+
 	HostSphere() = default;
+
     explicit HostSphere(int n)
     {
         num = n;
@@ -179,7 +183,9 @@ struct HostClump
     std::vector<int> pebbleStart;
     std::vector<int> pebbleEnd;
     HostDynamicState state;
+
     HostClump() = default;
+
 	explicit HostClump(int n)
 	{
 		num = n;
@@ -336,6 +342,7 @@ struct HostTriangleFace
     std::vector<int> face2Wall;
 
 	HostTriangleFace() = default;
+
 	explicit HostTriangleFace(int n)
 	{
 		num = n;
@@ -355,6 +362,7 @@ struct HostTriangleEdge
     std::vector<int> facePrefixSum;
 
 	HostTriangleEdge() = default;
+
     explicit HostTriangleEdge(int n)
     {
         num = n;
@@ -376,6 +384,7 @@ struct HostTriangleVertex
     std::vector<int> edgePrefixSum;
 
 	HostTriangleVertex() = default;
+
 	explicit HostTriangleVertex(int n)
 	{
 		num = n;
@@ -683,7 +692,9 @@ struct HostBasicInteraction
     std::vector<double3> torsionSpring;
     std::vector<double3> contactForce;
     std::vector<double3> contactTorque;
+
     HostBasicInteraction() = default;
+
     explicit HostBasicInteraction(int n) : capacity(n)
     {
         num = 0;
@@ -712,7 +723,9 @@ struct HostBondedInteraction
     std::vector<double> torsionTorque;
     std::vector<double3> shearForce;
     std::vector<double3> bendingTorque;
+
     HostBondedInteraction() = default;
+
     explicit HostBondedInteraction(int n) : num(n)
     {
         num = 0;
@@ -770,7 +783,6 @@ struct HostBondedContactModel
     std::vector<double> tensileStrength;
     std::vector<double> cohesion;
     std::vector<double> frictionCoeff;
-    std::vector<double> criticalDamping;
 };
 
 struct HostContactParameter
@@ -818,7 +830,6 @@ struct HostContactParameter
 		Bond.tensileStrength.resize(nC, 0.);
 		Bond.cohesion.resize(nC, 0.);
 		Bond.frictionCoeff.resize(nC, 0.);
-        Bond.criticalDamping.resize(nC, 0.);
 	}
 
     int getContactParameterIndex(int mA, int mB)
@@ -845,23 +856,6 @@ struct HostSpatialGrid
     int3 gridSize = make_int3(1, 1, 1);
 };
 
-struct HostSimulationParameter
-{
-    double3 domainOrigin = make_double3(0., 0., 0.);
-    double3 domainSize = make_double3(1., 1., 1.);
-	bool addBoundaryWalls = false; // whether to add boundary walls 
-    int boundaryWallMaterialIndex = 0;
-    double3 gravity = make_double3(0., 0., 0.);
-
-	double currentTime = 0.;
-    double timeMax = 1.;
-    double timeStep = 1.e-6;
-    int nPrint = 1;
-
-    int maxThreadsPerBlock = 256;
-    int deviceNumber = 0;
-};
-
 struct HostData
 {
     HostSphere spheres;
@@ -875,39 +869,4 @@ struct HostData
     HostBasicInteraction vertexSphInteract;
     HostContactParameter contactPara;
     HostSpatialGrid spatialGrids;
-    HostSimulationParameter simulation;
-
-    void buildSpatialGrid()
-    {
-        double maxSphereSize = *std::max_element(spheres.radii.begin(), spheres.radii.end()) * 2.;
-        double maxContactGap = *std::max_element(contactPara.Bond.maxContactGap.begin(), contactPara.Bond.maxContactGap.end());
-        double cellSizeOneDim = maxSphereSize + maxContactGap;
-        spatialGrids.minBound = simulation.domainOrigin;
-        spatialGrids.maxBound = simulation.domainOrigin + simulation.domainSize;
-        spatialGrids.gridSize.x = simulation.domainSize.x > cellSizeOneDim ? int(simulation.domainSize.x / cellSizeOneDim) : 1;
-        spatialGrids.gridSize.y = simulation.domainSize.y > cellSizeOneDim ? int(simulation.domainSize.y / cellSizeOneDim) : 1;
-        spatialGrids.gridSize.z = simulation.domainSize.z > cellSizeOneDim ? int(simulation.domainSize.z / cellSizeOneDim) : 1;
-        spatialGrids.cellSize.x = simulation.domainSize.x / double(spatialGrids.gridSize.x);
-        spatialGrids.cellSize.y = simulation.domainSize.y / double(spatialGrids.gridSize.y);
-        spatialGrids.cellSize.z = simulation.domainSize.z / double(spatialGrids.gridSize.z);
-        spatialGrids.num = spatialGrids.gridSize.x * spatialGrids.gridSize.y * spatialGrids.gridSize.z + 1;
-    }
-
-    void buildBasicInteraction()
-    {
-        if(SPHParticles.num > 0) sphSphInteract = HostBasicInteraction(50 * spheres.num);
-        else sphSphInteract = HostBasicInteraction(8 * spheres.num);
-        if (triangleWalls.num > 0)
-        {
-            faceSphInteract = HostBasicInteraction(spheres.num);
-            edgeSphInteract = HostBasicInteraction(spheres.num);
-            vertexSphInteract = HostBasicInteraction(triangleWalls.vertex.num);
-        }
-    }
-
-    void handleHostDataAfterLoading()
-    {
-        buildSpatialGrid();
-        buildBasicInteraction();
-    }
 };

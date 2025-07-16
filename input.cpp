@@ -277,8 +277,8 @@ void loadContactParameterInfo(const std::string& file, HostContactParameter& CP)
                     return;
                 }
                 std::istringstream is(line);
-                int i, j; double d, mult, E, ratio, tens, coh, mu, gamma;
-                is >> i >> j >> d >> mult >> E >> ratio >> tens >> coh >> mu >> gamma;
+                int i, j; double d, mult, E, ratio, tens, coh, mu;
+                is >> i >> j >> d >> mult >> E >> ratio >> tens >> coh >> mu;
                 if (i >= CP.material.num || j >= CP.material.num)
                 {
                     std::cerr << "Bonded Contact: Material index out of range" << '\n';
@@ -292,7 +292,6 @@ void loadContactParameterInfo(const std::string& file, HostContactParameter& CP)
                 CP.Bond.tensileStrength[idx] = tens;
                 CP.Bond.cohesion[idx] = coh;
                 CP.Bond.frictionCoeff[idx] = mu;
-                CP.Bond.criticalDamping[idx] = gamma;
             }
         }
     }

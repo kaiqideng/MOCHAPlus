@@ -103,7 +103,7 @@ void writeBasicInteractionsVTU(const std::string& fileName, const HostBasicInter
 
 void writeBondedInteractionsVTU(const std::string& fileName, const HostBondedInteraction& inter, int frame, double time, int step);
 
-void writeTriangleWallVTU(const std::string& fileName, const HostTriangleVertex& vertices, const HostTriangleFace& faces, const HostDynamicState& wallState, int frame, double time, int step);
+void writeTriangleWallVTU(const std::string& fileName, const HostTriangleWall TW, int frame, double time, int step);
 
 void writeTriangleWallPressureVTU(const std::string& fileName, const HostBasicInteraction& faceI, const HostBasicInteraction& edgeI, const HostBasicInteraction& vertexI, const HostTriangleWall& TW, int frame, double time, int step);
 
@@ -111,6 +111,4 @@ void writeSPHSpheresVTU(const std::string& fileName, const HostSPH& SPHP, const 
 
 void writeSolidSpheresVTU(const std::string& fileName, const HostSphere& s, int frame, double time, int step);
 
-void writeBoxSurfaceVTU(const std::string& fileName, const double3& minCorner, const double3& maxCorner);
-
-void writeHostDynamicStateToDat(const HostDynamicState& state, const std::string& filename, double time);
+void writeHostDynamicStateToDat(const HostDynamicState& state, int index, const std::string& filename, double time);

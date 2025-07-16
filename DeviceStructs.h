@@ -196,11 +196,11 @@ struct Sphere {
         state.copy(num, h.state);
         cuda_copy(SPHIndex, h.SPHIndex.data(), size_t(num), CopyDir::H2D);
     }
-    void upload(HostSphere& h)
+    void uploadState(HostSphere& h)
     {
         state.upload(num, h.state);
     }
-    void download(HostSphere& h)
+    void downloadState(HostSphere& h)
 	{
 		if (num < h.num) return;
 		state.download(h.num, h.state);
@@ -290,7 +290,7 @@ struct Clump {
         cuda_copy(pebbleEnd, h.pebbleEnd.data(), size_t(num), CopyDir::H2D);
         state.copy(num, h.state);
     }
-    void upload(HostClump& h)
+    void uploadState(HostClump& h)
 	{
 		state.upload(num, h.state);
 	}
@@ -455,11 +455,11 @@ struct TriangleWall {
         edge.copy(h.edge);
         vertex.copy(h.vertex);
     }
-    void upload(HostTriangleWall& h)
+    void uploadState(HostTriangleWall& h)
     {
         state.upload(num, h.state);
     }
-    void download(HostTriangleWall& h)
+    void downloadState(HostTriangleWall& h)
     {
         if (num < h.num) return;
         state.download(h.num, h.state);
@@ -824,7 +824,6 @@ struct BondedContactModel {
     double* tensileStrength{ nullptr };
     double* cohesion{ nullptr };
     double* frictionCoeff{ nullptr };
-    double* criticalDamping{ nullptr };
 
     void alloc(int nPair)
     {
@@ -836,7 +835,6 @@ struct BondedContactModel {
         CUDA_ALLOC(tensileStrength, nPair, InitMode::NONE);
         CUDA_ALLOC(cohesion, nPair, InitMode::NONE);
         CUDA_ALLOC(frictionCoeff, nPair, InitMode::NONE);
-        CUDA_ALLOC(criticalDamping, nPair, InitMode::NONE);
     }
     void release()
     {
@@ -847,7 +845,6 @@ struct BondedContactModel {
         CUDA_FREE(tensileStrength); 
         CUDA_FREE(cohesion); 
         CUDA_FREE(frictionCoeff);
-        CUDA_FREE(criticalDamping);
         num = 0;
     }
     void copy(const HostBondedContactModel& h)
@@ -861,7 +858,6 @@ struct BondedContactModel {
         cuda_copy(tensileStrength, h.tensileStrength.data(), num, CopyDir::H2D);
         cuda_copy(cohesion, h.cohesion.data(), num, CopyDir::H2D);
         cuda_copy(frictionCoeff, h.frictionCoeff.data(), num, CopyDir::H2D);
-        cuda_copy(criticalDamping, h.criticalDamping.data(), num, CopyDir::H2D);
     }
 };
 
@@ -902,7 +898,7 @@ struct ContactParameter
 };
 
 struct BoundaryWall {
-    int      num{ 0 };
+    int      numSpring{ 0 };
     int materialIndex{ 0 };
     double3* slidingSpring{ nullptr };
     double3* rollingSpring{ nullptr };
@@ -910,7 +906,7 @@ struct BoundaryWall {
 
     void alloc(int n)
     {
-        num = n;
+        numSpring = n;
         CUDA_ALLOC(slidingSpring, n, InitMode::ZERO);
         CUDA_ALLOC(rollingSpring, n, InitMode::ZERO);
         CUDA_ALLOC(torsionSpring, n, InitMode::ZERO);
@@ -920,7 +916,7 @@ struct BoundaryWall {
         CUDA_FREE(slidingSpring);
         CUDA_FREE(rollingSpring);
         CUDA_FREE(torsionSpring);
-        num = 0;
+        numSpring = 0;
     }
 };
 
@@ -992,15 +988,6 @@ struct DeviceData
         vertexSphInteract.copy(h.vertexSphInteract);
         contactPara.copy(h.contactPara);
         spatialGrids.copy(h.spatialGrids);
-        if (h.simulation.addBoundaryWalls)
-        {
-            boundaryWallX.materialIndex = h.simulation.boundaryWallMaterialIndex;
-            boundaryWallY.materialIndex = h.simulation.boundaryWallMaterialIndex;
-            boundaryWallZ.materialIndex = h.simulation.boundaryWallMaterialIndex;
-            boundaryWallX.alloc(h.spheres.num);
-            boundaryWallY.alloc(h.spheres.num);
-            boundaryWallZ.alloc(h.spheres.num);
-        }
     }
 
     void release()

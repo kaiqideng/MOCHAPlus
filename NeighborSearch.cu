@@ -138,7 +138,7 @@ __global__ void setSphereSphereInteractions(BasicInteraction I, Sphere sph,
                     int iMB = sph.materialIndex[idxB];
                     int iCP = CP.getContactParameterIndex(iMA, iMB);
                     double maxContactGap = CP.Bond.maxContactGap[iCP];
-                    if (sphereOverlap + maxContactGap >= 0.)
+                    if (sphereOverlap + maxContactGap >= -0.05 * (radA + radB))
                     {
                         if (flag == 0)
                         {
@@ -491,6 +491,7 @@ __global__ void setSphereSphereBondedInteractions(BondedInteraction bondedI,
 
     int idxA = sphSphI.objectPointed[idx];
     int idxB = sphSphI.objectPointing[idx];
+    if (sph.SPHIndex[idxA] >= 0 || sph.SPHIndex[idxB] >= 0) return;
     bondedI.objectPointed[idx] = idxA;
     bondedI.objectPointing[idx] = idxB;
     bondedI.contactNormal[idx] = sphSphI.contactNormal[idx];
@@ -501,13 +502,16 @@ __global__ void setSphereSphereBondedInteractions(BondedInteraction bondedI,
     bondedI.shearForce[idx] = make_double3(0., 0., 0.);
     bondedI.bendingTorque[idx] = make_double3(0., 0., 0.);
     int iCP = CP.getContactParameterIndex(sph.materialIndex[idxA], sph.materialIndex[idxB]);
-    if (CP.Bond.elasticModulus[iCP] > 0. && 
-        sph.bondClusterIndex[idxA] >= 0 &&
-		sph.bondClusterIndex[idxB] >= 0 &&
-        sph.bondClusterIndex[idxA] == sph.bondClusterIndex[idxB])
+    if (CP.Bond.elasticModulus[iCP] > 0.)
     {
-        bondedI.isBonded[idx] = 1;
-    }
+        if (sph.bondClusterIndex[idxA] >= 0 &&
+            sph.bondClusterIndex[idxB] >= 0 &&
+            sph.bondClusterIndex[idxA] == sph.bondClusterIndex[idxB])
+        {
+            if (sphSphI.normalOverlap[idx] + CP.Bond.maxContactGap[iCP] < 0.) return;
+            bondedI.isBonded[idx] = 1;
+        }
+    } 
 }
 
 void setBondedInteractions(DeviceData& d, int maxThreadsPerBlock)

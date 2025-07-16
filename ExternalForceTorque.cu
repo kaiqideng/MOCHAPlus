@@ -1,7 +1,7 @@
 #include "ExternalForceTorque.cuh"
 
 __global__ void calHydroForce(Sphere sph,
-	double3 currentVel,
+	double3 waterVel,
 	double waterDensity,
 	double waterLevel0,
 	double Cd)
@@ -28,7 +28,7 @@ __global__ void calHydroForce(Sphere sph,
 	}
 	if (pos.z - r < waterLevel0)
 	{
-		double3 relVel = currentVel - vel;
+		double3 relVel = waterVel - vel;
 		double3 dragForce = 0.5 * Cd * pi() * pow(r, 2) * waterDensity * length(relVel) * relVel;
 		hydroForce += dragForce;
 		hydroTorque = 0.5 * Cd * pi() * pow(r, 4) * waterDensity * length(ang) * (-ang);
@@ -52,7 +52,7 @@ __global__ void calGlobalDampingForceTorque(Sphere sph,
 }
 
 void calculateHydroForce(Sphere sph,
-	double3 currentVel,
+	double3 waterVel,
 	double waterDensity,
 	double waterLevel0,
 	double Cd,
@@ -65,7 +65,7 @@ void calculateHydroForce(Sphere sph,
 	{
 		computeGPUParameter(grid, block, numObjects, maxThreadsPerBlock);
 		calHydroForce << <grid, block >> > (sph,
-			currentVel,
+			waterVel,
 			waterDensity,
 			waterLevel0,
 			Cd);

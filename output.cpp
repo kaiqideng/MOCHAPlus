@@ -330,9 +330,7 @@ void writeBondedInteractionsVTU(const std::string& fileName, const HostBondedInt
         "</VTKFile>\n";
 }
 
-void writeTriangleWallVTU(const std::string& fileName, const HostTriangleVertex& vertices,
-    const HostTriangleFace& faces,
-    const HostDynamicState& wallState,
+void writeTriangleWallVTU(const std::string& fileName, const HostTriangleWall TW,
     int   frame,
     double time,
     int   step)
@@ -350,8 +348,8 @@ void writeTriangleWallVTU(const std::string& fileName, const HostTriangleVertex&
     if (!out) { fprintf(stderr, "Cannot open %s\n", fname.str().c_str()); return; }
     out << std::fixed << std::setprecision(7);
 
-    const int Nv = vertices.num;
-    const int Nf = faces.num;
+    const int Nv = TW.vertex.num;
+    const int Nf = TW.face.num;
 
     /* -------- 3 XML HEADER + FieldData -------- */
     out <<
@@ -372,9 +370,9 @@ void writeTriangleWallVTU(const std::string& fileName, const HostTriangleVertex&
         "      <Points>\n"
         "        <DataArray type=\"Float32\" NumberOfComponents=\"3\" format=\"ascii\">\n";
     for (int i = 0; i < Nv; ++i) {
-        const double3& p = vertices.positions[i];
-        int iw = vertices.vertex2Wall[i];
-        double3 pp = rotateVectorByQuaternion(wallState.orientations[iw], p) + wallState.positions[iw];
+        const double3& p = TW.vertex.positions[i];
+        int iw = TW.vertex.vertex2Wall[i];
+        double3 pp = rotateVectorByQuaternion(TW.state.orientations[iw], p) + TW.state.positions[iw];
         out << ' ' << pp.x << ' ' << pp.y << ' ' << pp.z;
     }
     out <<
@@ -386,9 +384,9 @@ void writeTriangleWallVTU(const std::string& fileName, const HostTriangleVertex&
         "      <Cells>\n"
         "        <DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">\n";
     for (int i = 0; i < Nf; ++i) {
-        out << ' ' << faces.vAIndex[i]
-            << ' ' << faces.vBIndex[i]
-            << ' ' << faces.vCIndex[i];
+        out << ' ' << TW.face.vAIndex[i]
+            << ' ' << TW.face.vBIndex[i]
+            << ' ' << TW.face.vCIndex[i];
     }
     out <<
         "\n        </DataArray>\n"
@@ -402,11 +400,11 @@ void writeTriangleWallVTU(const std::string& fileName, const HostTriangleVertex&
         "\n        </DataArray>\n"
         "      </Cells>\n";
 
-    if (!faces.face2Wall.empty()) {
+    if (!TW.face.face2Wall.empty()) {
         out <<
             "      <CellData Scalars=\"face2Wall\">\n"
             "        <DataArray type=\"Int32\" Name=\"face2Wall\" format=\"ascii\">\n";
-        for (int i = 0; i < Nf; ++i) out << ' ' << faces.face2Wall[i];
+        for (int i = 0; i < Nf; ++i) out << ' ' << TW.face.face2Wall[i];
         out <<
             "\n        </DataArray>\n"
             "      </CellData>\n";
@@ -795,90 +793,9 @@ void writeSolidSpheresVTU(const std::string& fileName, const HostSphere& s,
         "</VTKFile>\n";
 }
 
-void writeBoxSurfaceVTU(const std::string& fileName,
-    const double3& minCorner,
-    const double3& maxCorner) {
-    // 8 corner points
-    std::vector<double3> points = {
-        {minCorner.x, minCorner.y, minCorner.z}, // 0
-        {maxCorner.x, minCorner.y, minCorner.z}, // 1
-        {minCorner.x, maxCorner.y, minCorner.z}, // 2
-        {maxCorner.x, maxCorner.y, minCorner.z}, // 3
-        {minCorner.x, minCorner.y, maxCorner.z}, // 4
-        {maxCorner.x, minCorner.y, maxCorner.z}, // 5
-        {minCorner.x, maxCorner.y, maxCorner.z}, // 6
-        {maxCorner.x, maxCorner.y, maxCorner.z}  // 7
-    };
-
-    // 6 faces as quads (4 points each)
-    std::vector<std::vector<int>> faces = {
-        {0, 1, 3, 2}, // bottom
-        {4, 5, 7, 6}, // top
-        {0, 1, 5, 4}, // front
-        {2, 3, 7, 6}, // back
-        {0, 2, 6, 4}, // left
-        {1, 3, 7, 5}  // right
-    };
-    /* --- make sure "output" dir exists (ignore error if it does) --- */
-    MKDIR("outputData");
-
-    /* --- build file name: output/spheres_XXXX.vtu --- */
-    std::ostringstream fname;
-    fname << "outputData/" << fileName << ".vtu";
-
-    std::ofstream out(fname.str().c_str());
-    if (!out) throw std::runtime_error("Cannot open " + fname.str());
-
-    out << std::fixed << std::setprecision(6);
-    out << "<?xml version=\"1.0\"?>\n";
-    out << "<VTKFile type=\"UnstructuredGrid\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
-    out << "<UnstructuredGrid>\n";
-    out << "<Piece NumberOfPoints=\"" << points.size() << "\" NumberOfCells=\"" << faces.size() << "\">\n";
-
-    // Points
-    out << "<Points>\n";
-    out << "<DataArray type=\"Float64\" NumberOfComponents=\"3\" format=\"ascii\">\n";
-    for (const auto& p : points)
-        out << p.x << " " << p.y << " " << p.z << "\n";
-    out << "</DataArray>\n</Points>\n";
-
-    // Faces (as quads)
-    out << "<Cells>\n";
-
-    // connectivity
-    out << "<DataArray type=\"Int32\" Name=\"connectivity\" format=\"ascii\">\n";
-    for (const auto& f : faces)
-        for (int id : f)
-            out << id << " ";
-    out << "\n</DataArray>\n";
-
-    // offsets
-    out << "<DataArray type=\"Int32\" Name=\"offsets\" format=\"ascii\">\n";
-    int offset = 0;
-    for (size_t i = 0; i < faces.size(); ++i) {
-        offset += 4;
-        out << offset << " ";
-    }
-    out << "\n</DataArray>\n";
-
-    // cell types: 9 = quad
-    out << "<DataArray type=\"UInt8\" Name=\"types\" format=\"ascii\">\n";
-    for (size_t i = 0; i < faces.size(); ++i)
-        out << "9 ";
-    out << "\n</DataArray>\n";
-
-    out << "</Cells>\n";
-
-    // No point/cell data
-    out << "<PointData>\n</PointData>\n";
-    out << "<CellData>\n</CellData>\n";
-
-    out << "</Piece>\n</UnstructuredGrid>\n</VTKFile>\n";
-    out.close();
-}
-
 void writeHostDynamicStateToDat(
     const HostDynamicState& state,
+    int index,
     const std::string& filename,
     double time)
 {
@@ -890,7 +807,7 @@ void writeHostDynamicStateToDat(
         finalName = "outputData/state.dat";
     }
     else {
-        finalName = "outputData/" + filename + ".dat";
+        finalName = "outputData/" + filename +".dat";
     }
 
     std::ofstream outFile(finalName, std::ios::app);

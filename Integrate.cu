@@ -1,5 +1,14 @@
 #include "Integrate.cuh"
 
+__global__ void clearForceTorque(double3* forces, double3* torques,
+	int num)
+{
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx >= num) return;
+	forces[idx] = make_double3(0., 0., 0.);
+	torques[idx] = make_double3(0., 0., 0.);
+}
+
 __global__ void integrateBeforeContactCalculation(DynamicState state,
 	double3 gravity,
 	double timeStep,
@@ -26,7 +35,7 @@ __global__ void integrateAfterContactCalculation(DynamicState state,
 	state.angularVelocities[idx] += (rotateInverseInertiaTensor(state.orientations[idx], state.inverseInertia[idx]) * state.torques[idx]) * 0.5 * timeStep * (invMass != 0);
 }
 
-__global__ void correctWCSPHMotion(Sphere sph,
+__global__ void correctSPHMotion(Sphere sph,
 	SPH SPHP,
 	double timeStep)
 {
@@ -37,7 +46,25 @@ __global__ void correctWCSPHMotion(Sphere sph,
 	sph.state.positions[idx] += SPHP.XSPHVariant[SPHIndex] * timeStep;
 }
 
-__global__ void updatePebblesMotionBeforeContact(Clump clump,
+__global__ void calClumpForceTorque(Clump clump,
+	Sphere sph)
+{
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx >= clump.num) return;
+	clump.state.forces[idx] = make_double3(0, 0, 0);
+	clump.state.torques[idx] = make_double3(0, 0, 0);
+	for (int i = clump.pebbleStart[idx]; i < clump.pebbleEnd[idx];++i)
+	{
+		if (sph.clumpIndex[i] != idx) continue;
+		clump.state.forces[idx] += sph.state.forces[i];
+		clump.state.torques[idx] += sph.state.torques[i];
+		clump.state.torques[idx] += cross(sph.state.positions[i] - clump.state.positions[idx], sph.state.forces[i]);
+		sph.state.forces[i] = make_double3(0, 0, 0);
+		sph.state.torques[i] = make_double3(0, 0, 0);
+	}
+}
+
+__global__ void updatePebbleMotionBeforeContact(Clump clump,
 	Sphere sph,
 	double timeStep)
 {
@@ -68,14 +95,13 @@ void integrateBeforeContact(DeviceData& d, double3 gravity, double timeStep, int
 		timeStep, 
 		d.spheres.num);
 	//cudaDeviceSynchronize();
-
-	//if (d.SPHParticles.num > 0.)
-	//{
-	//	correctWCSPHMotion << <grid, block >> > (d.spheres,
-	//		d.SPHParticles,
-	//		timeStep);
-	//	//cudaDeviceSynchronize();
-	//}
+	//correctSPHMotion << <grid, block >> > (d.spheres,
+	//	d.SPHParticles,
+	//	timeStep);
+	//cudaDeviceSynchronize();
+	clearForceTorque << <grid, block >> > (d.spheres.state.forces, d.spheres.state.torques,
+		d.spheres.num);
+	//cudaDeviceSynchronize();
 
 	if (d.triangleWalls.num > 0)
 	{
@@ -84,6 +110,9 @@ void integrateBeforeContact(DeviceData& d, double3 gravity, double timeStep, int
 		integrateBeforeContactCalculation << <grid, block >> > (d.triangleWalls.state, 
 			gravity, 
 			timeStep, 
+			d.triangleWalls.num);
+		//cudaDeviceSynchronize();
+		clearForceTorque << <grid, block >> > (d.triangleWalls.state.forces, d.triangleWalls.state.torques,
 			d.triangleWalls.num);
 		//cudaDeviceSynchronize();
 	}
@@ -96,7 +125,7 @@ void integrateBeforeContact(DeviceData& d, double3 gravity, double timeStep, int
 			gravity,
 			timeStep,
 			d.clumps.num);
-		updatePebblesMotionBeforeContact << <grid, block >> > (d.clumps,
+		updatePebbleMotionBeforeContact << <grid, block >> > (d.clumps,
 			d.spheres,
 			timeStep);
 		//cudaDeviceSynchronize();
@@ -131,6 +160,9 @@ void integrateAfterContact(DeviceData& d, double3 gravity, double timeStep, int 
 	{
 		numObjects = d.clumps.num;
 		computeGPUParameter(grid, block, numObjects, maxThreadsPerBlock);
+		calClumpForceTorque << <grid, block >> > (d.clumps,
+			d.spheres);
+		//cudaDeviceSynchronize();
 		integrateAfterContactCalculation << <grid, block >> > (d.clumps.state,
 			gravity,
 			timeStep,

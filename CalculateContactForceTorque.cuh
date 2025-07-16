@@ -48,18 +48,10 @@ __device__ __forceinline__ int ParallelBondedContact(double& bondNormalForce, do
 	if (bondTensileStrength > 0 && maxNormalStress > bondTensileStrength)
 	{
 		isBonded = 0;
-		bondNormalForce = 0;
-		bondTorsionalTorque = 0.;
-		bondShearForce = make_double3(0, 0, 0);
-		bondBendingTorque = make_double3(0, 0, 0);
 	}
 	else if (bondCohesion > 0 && maxShearStress > bondCohesion - bondFrictionCoefficient * maxNormalStress)
 	{
 		isBonded = 0;
-		bondNormalForce = 0;
-		bondTorsionalTorque = 0.;
-		bondShearForce = make_double3(0, 0, 0);
-		bondBendingTorque = make_double3(0, 0, 0);
 	}
 	return isBonded;
 }
@@ -269,28 +261,40 @@ __global__ void calSPHPressure(SPH SPHP);
 
 __global__ void calXSPHVelocityCorrection(SPH SPHP, Sphere sph, BasicInteraction sphSphI);
 
+__global__ void calSPHForce(BasicInteraction I, SPH SPHP, Sphere sph);
+
 __global__ void calDEMSPHForce(BasicInteraction I, SPH SPHP, Sphere sph);
 
-__global__ void calWallSPHForce(BasicInteraction I, SPH SPHP, Sphere sph, int* element2Wall, DynamicState wallState);
+__global__ void calTriangleWallSPHForce(BasicInteraction I, SPH SPHP, Sphere sph, int* element2Wall, DynamicState wallState);
+
+__global__ void addBoundaryForceTorque2DEM(Sphere sph, ContactParameter CP, BoundaryWall wall, double3 pointOnWall, double3 wallNormal, double timeStep);
+
+__global__ void addBoundaryForceTorque2SPH(Sphere sph, SPH SPHP, double3 pointOnWall, double3 wallNormal);
 
 __global__ void accumulateSphereForceTorqueA(Sphere sph, BasicInteraction I);
 
 __global__ void accumulateSphereForceTorqueB(double3* forces, double3* torques, double3* positions, int* iRangeStart, int* iRangeEnd, BasicInteraction I, int num);
 
-__global__ void clearForceTorque(double3* forces, double3* torques, int num);
-
 __global__ void accumulateTriangleWallForceTorque(double3* forces, double3* torques, double3* positions, int* neighborPrefixSum, int* element2Wall, BasicInteraction I, int num);
-
-__global__ void addBoundaryForceTorque(Sphere sph, SPH SPHP, ContactParameter CP, BoundaryWall wall, double3 pointOnWall, double3 wallNormal, double timeStep);
-
-__global__ void calClumpForceTorque(Clump clump, Sphere sph);
 
 void SPHDensityShephardFilter(DeviceData& d, int maxThreadsPerBlock);
 
-void sphere2Sphere(DeviceData& d, double timeStep, int maxThreadsPerBlock, int iStep);
+void sphere2SphereDEM(DeviceData& d, double timeStep, int maxThreadsPerBlock, int iStep);
 
-void wall2Sphere(DeviceData& d, double timeStep, int maxThreadsPerBlock);
+void sphere2SphereSPH(DeviceData& d, double timeStep, int maxThreadsPerBlock, int iStep);
+
+void wall2SphereDEM(DeviceData& d, double timeStep, int maxThreadsPerBlock);
+
+void wall2SphereSPH(DeviceData& d, int maxThreadsPerBlock);
+
+void boundary2SphereDEM(DeviceData& d, double timeStep, int maxThreadsPerBlock);
+
+void boundary2SphereSPH(DeviceData& d, int maxThreadsPerBlock);
+
+void calculateContactForceTorqueDEM(DeviceData& d, double timeStep, int maxThreadsPerBlock, int iStep);
+
+void calculateContactForceTorqueSPH(DeviceData& d, double timeStep, int maxThreadsPerBlock, int iStep);
+
+void calculateContactForceTorqueDEMSPH(DeviceData& d, int maxThreadsPerBlock);
 
 void accumulateForceTorque(DeviceData& d, int maxThreadsPerBlock);
-
-void calculateContactForceTorque(DeviceData& d, double timeStep, int maxThreadsPerBlock, int iStep);
