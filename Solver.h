@@ -44,7 +44,7 @@ public:
         stepMax = 1;
         saveAccount = 1;
         iStep = 1;
-        double currentTime = 0.;
+        currentTime = 0.;
         computeTime_neighborSearch = 0.;
         computeTime_contact = 0.;
         computeTime_integration = 0.;
@@ -141,8 +141,8 @@ protected:
     {
         if (tMax > 0.) timeMax = tMax;
         if (dt > 0.) timeStep = dt;
-        int numSteps = (timeMax - currentTime) / timeStep + 1;
-        if (numSteps > 0) stepMax = iStep + numSteps;
+        int numSteps = int((timeMax - currentTime) / timeStep) + 1;
+        if (numSteps > 0) stepMax = iStep + numSteps - 1;
         saveAccount = numSteps / n;
         if (saveAccount < 1)  saveAccount = 1;
     };
@@ -292,6 +292,8 @@ private:
 
     virtual void calculateParticleContactForceTorque(DeviceData& D, double dt, int maxThread, int i) {};
 
+    virtual void boundaryForceTorque(DeviceData& D, double dt, int maxThread) {};
+
     void release()
     {
         dev.release();
@@ -313,7 +315,12 @@ private:
 
     void calculateParticleContactForceTorque(DeviceData& D, double dt, int maxThread, int i)override
     {
-		calculateContactForceTorqueDEM(D, dt, maxThread, i);
+		calculateContactForceTorqueDEM(D, dt, maxThread);
+    }
+
+    void boundaryForceTorque(DeviceData& D, double dt, int maxThread)override
+    {
+        boundary2SphereDEM(D, dt, maxThread);
     }
 };
 
@@ -328,6 +335,11 @@ private:
     void calculateParticleContactForceTorque(DeviceData& D, double dt, int maxThread, int i)override
     {
         calculateContactForceTorqueSPH(D, dt, maxThread, i);
+    }
+
+    void boundaryForceTorque(DeviceData& D, double dt, int maxThread)override
+    {
+        boundary2SphereSPH(D, maxThread);
     }
 };
 
@@ -346,9 +358,15 @@ private:
 
     void calculateParticleContactForceTorque(DeviceData& D, double dt, int maxThread, int i)override
     {
-        calculateContactForceTorqueDEM(D, dt, maxThread, i);
+        calculateContactForceTorqueDEM(D, dt, maxThread);
 		calculateContactForceTorqueSPH(D, dt, maxThread, i);
         calculateContactForceTorqueDEMSPH(D, maxThread);
+    }
+
+    void boundaryForceTorque(DeviceData& D, double dt, int maxThread)override
+    {
+        boundary2SphereDEM(D, dt, maxThread);
+        boundary2SphereSPH(D, maxThread);
     }
 };
 

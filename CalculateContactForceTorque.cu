@@ -30,7 +30,7 @@ __device__ __forceinline__ void atomicAddDouble3(double3* arr, int idx, const do
 	atomicAddDouble(&(arr[idx].z), v.z);
 }
 
-__global__ void calSphereSphereContactForceTorque(BasicInteraction I, 
+__global__ void calSolidSphereContactForceTorque(BasicInteraction I, 
 	Sphere sph, 
 	ContactParameter CP, 
 	double timeStep)
@@ -40,18 +40,20 @@ __global__ void calSphereSphereContactForceTorque(BasicInteraction I,
 
 	int idxA = I.objectPointed[idx];
 	int idxB = I.objectPointing[idx];
+
+	if (sph.SPHIndex[idxA] >= 0 || sph.SPHIndex[idxB] >= 0) return;//If either sphere is SPH, skip
+
 	double radA = sph.radii[idxA];
 	double radB = sph.radii[idxB];
 	double3 posA = sph.state.positions[idxA];
 	double3 posB = sph.state.positions[idxB];
+	//Update contact information of every sphere-sphere interaction (The contact information is updated in Neighbor Search every 30 steps)
 	double normalOverlap = radA + radB - length(posA - posB);
 	double3 contactNormal = normalize(posA - posB);
 	double3 contactPoint = posB + (radB - 0.5 * normalOverlap) * contactNormal;
 	I.normalOverlap[idx] = normalOverlap;
 	I.contactNormal[idx] = contactNormal;
 	I.contactPoint[idx] = contactPoint;
-
-	if (sph.SPHIndex[idxA] >= 0 || sph.SPHIndex[idxB] >= 0) return;
 
 	double3 contactForce = make_double3(0., 0., 0.);
 	double3 contactTorque = make_double3(0., 0., 0.);
@@ -97,7 +99,7 @@ __global__ void calSphereSphereContactForceTorque(BasicInteraction I,
 	I.torsionSpring[idx] = torsionSpring;
 }
 
-__global__ void calTriangleWallSphereContactForceTorque(BasicInteraction I, 
+__global__ void calTriangleWallSolidSphereContactForceTorque(BasicInteraction I, 
 	Sphere sph, 
 	int* element2Wall,
 	int* wallMaterialIndex,
@@ -111,7 +113,7 @@ __global__ void calTriangleWallSphereContactForceTorque(BasicInteraction I,
 	int idxA = I.objectPointed[idx];
 	int idxB = I.objectPointing[idx];
 
-	if (sph.SPHIndex[idxB] >= 0) return;
+	if (sph.SPHIndex[idxB] >= 0) return;//If sphere is SPH, skip
 
 	double3 contactForce = make_double3(0., 0., 0.);
 	double3 contactTorque = make_double3(0., 0., 0.);
@@ -297,7 +299,10 @@ __global__ void calSPHSPSStress(SPH SPHP,
 	if (SPHA < 0) return;
 	double3 posA = sph.state.positions[idxA];
 	double3 velA = sph.state.velocities[idxA];
+	symMatrix strainRateA = make_symMatrix(0., 0., 0., 0., 0., 0.);
 	symMatrix stressA = make_symMatrix(0., 0., 0., 0., 0., 0.);
+	double hAll = 0;
+	int nPairs = 0;
 	for (int i = idxA > 0 ? sph.neighbor.prefixSum[idxA - 1] : 0; i < sph.neighbor.prefixSum[idxA]; i++)
 	{
 		int idxB = sphSphI.objectPointing[i];
@@ -308,27 +313,19 @@ __global__ void calSPHSPSStress(SPH SPHP,
 			double3 posB = sph.state.positions[idxB];
 			double3 velB = sph.state.velocities[idxB];
 			double h = 0.5 * (sph.radii[idxA] + sph.radii[idxB]);
+			hAll += h;
+			nPairs++;
 			double3 relDist = posA - posB;
 			double3 relVel = velA - velB;
 			double3 gradW = gradCubicSplineKernel3D(relDist, h);
-			symMatrix strainRateA = make_symMatrix(0., 0., 0., 0., 0., 0.);
-			strainRateA.xx = -relVel.x * gradW.x * volB;
-			strainRateA.yy = -relVel.y * gradW.y * volB;
-			strainRateA.zz = -relVel.z * gradW.z * volB;
-			strainRateA.xy = -0.5 * (relVel.x * gradW.y + relVel.y * gradW.x) * volB;
-			strainRateA.xz = -0.5 * (relVel.x * gradW.z + relVel.z * gradW.x) * volB;
-			strainRateA.yz = -0.5 * (relVel.y * gradW.z + relVel.z * gradW.y) * volB;
-			double Cs = 0.1;
-			double S_norm = norm(strainRateA);
-			double vt = pow(Cs * length(relDist), 2) * S_norm;
-			symMatrix term1 = (2. * vt) * deviatoric(strainRateA);
-			double Ci = 6.6e-3;
-			double scalar = (2.0 / 3.0) * Ci * h * h * S_norm * S_norm;
-			symMatrix term2 = make_symMatrix(scalar, scalar, scalar, 0., 0., 0.);
-			stressA = stressA + (term1 - term2);
+			strainRateA.xx += (-relVel.x * gradW.x * volB);
+			strainRateA.yy += (-relVel.y * gradW.y * volB);
+			strainRateA.zz += (-relVel.z * gradW.z * volB);
+			strainRateA.xy += (-0.5 * (relVel.x * gradW.y + relVel.y * gradW.x) * volB);
+			strainRateA.xz += (-0.5 * (relVel.x * gradW.z + relVel.z * gradW.x) * volB);
+			strainRateA.yz += (-0.5 * (relVel.y * gradW.z + relVel.z * gradW.y) * volB);
 		}
 	}
-
 	if (sph.sphereRange.start[idxA] != 0xFFFFFFFF)
 	{
 		for (int i = sph.sphereRange.start[idxA]; i < sph.sphereRange.end[idxA]; i++)
@@ -342,27 +339,30 @@ __global__ void calSPHSPSStress(SPH SPHP,
 				double3 posB = sph.state.positions[idxB];
 				double3 velB = sph.state.velocities[idxB];
 				double h = 0.5 * (sph.radii[idxA] + sph.radii[idxB]);
+				hAll += h;
+				nPairs++;
 				double3 relDist = posA - posB;
 				double3 relVel = velA - velB;
 				double3 gradW = gradCubicSplineKernel3D(relDist, h);
-				symMatrix strainRateA = make_symMatrix(0., 0., 0., 0., 0., 0.);
-				strainRateA.xx = -relVel.x * gradW.x * volB;
-				strainRateA.yy = -relVel.y * gradW.y * volB;
-				strainRateA.zz = -relVel.z * gradW.z * volB;
-				strainRateA.xy = -0.5 * (relVel.x * gradW.y + relVel.y * gradW.x) * volB;
-				strainRateA.xz = -0.5 * (relVel.x * gradW.z + relVel.z * gradW.x) * volB;
-				strainRateA.yz = -0.5 * (relVel.y * gradW.z + relVel.z * gradW.y) * volB;
-				double Cs = 0.1;
-				double S_norm = norm(strainRateA);
-				double vt = pow(Cs * length(relDist), 2) * S_norm;
-				symMatrix term1 = (2. * vt) * deviatoric(strainRateA);
-				double Ci = 6.6e-3;
-				double scalar = (2.0 / 3.0) * Ci * h * h * S_norm * S_norm;
-				symMatrix term2 = make_symMatrix(scalar, scalar, scalar, 0., 0., 0.);
-				stressA = stressA + (term1 - term2);
+				strainRateA.xx += (-relVel.x * gradW.x * volB);
+				strainRateA.yy += (-relVel.y * gradW.y * volB);
+				strainRateA.zz += (-relVel.z * gradW.z * volB);
+				strainRateA.xy += (-0.5 * (relVel.x * gradW.y + relVel.y * gradW.x) * volB);
+				strainRateA.xz += (-0.5 * (relVel.x * gradW.z + relVel.z * gradW.x) * volB);
+				strainRateA.yz += (-0.5 * (relVel.y * gradW.z + relVel.z * gradW.y) * volB);
 			}
 		}
 	}
+	double Cs = 0.1;
+	double S_norm = norm(strainRateA);
+	double deltaL = 0.;
+	if (nPairs > 0) deltaL = hAll / double(nPairs);
+	double vt = pow(Cs * deltaL, 2) * S_norm;
+	symMatrix term1 = (2. * vt) * deviatoric(strainRateA);
+	double Ci = 6.6e-3;
+	double scalar = (2.0 / 3.0) * Ci * deltaL * deltaL * S_norm * S_norm;
+	symMatrix term2 = make_symMatrix(scalar, scalar, scalar, 0., 0., 0.);
+	stressA = stressA + (term1 - term2);
 	SPHP.SPSStress[SPHA] = stressA * SPHP.density[SPHA];
 }
 
@@ -545,9 +545,19 @@ __global__ void calSPHForce(BasicInteraction I,
 	int SPHB = sph.SPHIndex[idxB];
 	if (SPHA >= 0 && SPHB >= 0)
 	{
-		double h = 0.5 * (sph.radii[idxA] + sph.radii[idxB]);//smooth Length
+		double radA = sph.radii[idxA];
+		double radB = sph.radii[idxB];
 		double3 posA = sph.state.positions[idxA];
 		double3 posB = sph.state.positions[idxB];
+
+		//Update contact information of sphere-sphere interactions (The contact information is updated in Neighbor Search every 30 steps)
+		double normalOverlap = radA + radB - length(posA - posB);
+		double3 contactNormal = normalize(posA - posB);
+		double3 contactPoint = posB + (radB - 0.5 * normalOverlap) * contactNormal;
+		I.normalOverlap[idx] = normalOverlap;
+		I.contactNormal[idx] = contactNormal;
+		I.contactPoint[idx] = contactPoint;
+
 		double3 velA = sph.state.velocities[idxA];
 		double3 velB = sph.state.velocities[idxB];
 		double massA = 1. / sph.state.inverseMass[idxA];
@@ -556,11 +566,11 @@ __global__ void calSPHForce(BasicInteraction I,
 		double pressureB = SPHP.pressure[SPHB];
 		double rhoA = SPHP.density[SPHA];
 		double rhoB = SPHP.density[SPHB];
+		double h = 0.5 * (radA + radB);//smooth Length
 
 		double3 pressureForce = make_double3(0, 0, 0);
 		double3 viscosityForce = make_double3(0., 0., 0.);
 		double3 SPSForce = make_double3(0., 0., 0.);
-
 		double3 relativeDist = posA - posB;
 		double pressureTerm = pressureA / (pow(rhoA, 2)) + pressureB / (pow(rhoB, 2));
 		double RAB = (pressureA > 0 && pressureB > 0.) ?
@@ -607,28 +617,41 @@ __global__ void calDEMSPHForce(BasicInteraction I,
 	int SPHB = sph.SPHIndex[idxB];
 	double3 posA = sph.state.positions[idxA];
 	double3 posB = sph.state.positions[idxB];
+	double radA = sph.radii[idxA];
+	double radB = sph.radii[idxB];
+	//Update contact information of sphere-sphere interactions (The contact information is updated in Neighbor Search every 30 steps)
+	double normalOverlap = radA + radB - length(posA - posB);
+	double3 contactNormal = normalize(posA - posB);
+	double3 contactPoint = posB + (radB - 0.5 * normalOverlap) * contactNormal;
+	I.normalOverlap[idx] = normalOverlap;
+	I.contactNormal[idx] = contactNormal;
+	I.contactPoint[idx] = contactPoint;
 	double h = 0.;
 	double q = 0.;
 	double relZ = 0.;
 	if (SPHA >= 0 && SPHB < 0)
 	{
+		I.contactForce[idx] = make_double3(0, 0, 0);
 		h = sph.radii[idxA];
-		double dis = 2 * length(posA - I.contactPoint[idx]);
-		q = dis / (2 * h);
+		double dis = length(posA - contactPoint);
+		q = dis / h;
 		relZ = posA.z - SPHP.z0;
 	}
 	else if (SPHA < 0 && SPHB >= 0)
 	{
+		I.contactForce[idx] = make_double3(0, 0, 0);
 		h = sph.radii[idxB];
-		double dis = 2 * length(posB - I.contactPoint[idx]);
-		q = dis / (2 * h);
+		double dis = length(posB - contactPoint);
+		q = dis / h;
 		relZ = posB.z - SPHP.z0;
 	}
+	else
+	{
+		return;
+	}
 
-	double3 solidForce = make_double3(0., 0., 0.);
 	if (q > 0. && q <= 1.)
 	{
-		double3 contactNormal = I.contactNormal[idx];
 		double u = dot(sph.state.velocities[idxA] - sph.state.velocities[idxB], contactNormal);
 		double A = 0.01 * pow(SPHP.c0, 2) / h;
 		//if (u < 0) A += SPHP.c0 * (-u) / h;
@@ -637,10 +660,8 @@ __global__ void calDEMSPHForce(BasicInteraction I,
 		double epsilon = relZ >= 0 ? 0.02 : absH + 0.02;
 		if (absH > 1) epsilon = 1;
 		if (u < 0) epsilon += abs(20 * u) >= SPHP.c0 ? 1 : abs(20 * u) / SPHP.c0;
-		solidForce = contactNormal * Rd * epsilon;
+		I.contactForce[idx] = contactNormal * Rd * epsilon;
 	}
-
-	I.contactForce[idx] = solidForce;
 }
 
 __global__ void calTriangleWallSPHForce(BasicInteraction I,
@@ -655,12 +676,12 @@ __global__ void calTriangleWallSPHForce(BasicInteraction I,
 	int idxB = I.objectPointing[idx];
 	int SPHB = sph.SPHIndex[idxB];
 	if (SPHB < 0) return;
-	double3 solidForce = make_double3(0., 0., 0.);
+
 	double3 posB = sph.state.positions[idxB];
 	double h = sph.radii[idxB];
 	double3 contactPoint = I.contactPoint[idx];
-	double dis = 2 * length(posB - contactPoint);
-	double q = dis / (2 * h);
+	double dis = length(posB - contactPoint);
+	double q = dis / h;
 	if (q > 0. && q <= 1.)
 	{
 		int iw = element2Wall[I.objectPointed[idx]];
@@ -675,21 +696,21 @@ __global__ void calTriangleWallSPHForce(BasicInteraction I,
 		double epsilon = relZ >= 0 ? 0.02 : absH + 0.02;
 		if (absH > 1) epsilon = 1;
 		if (u < 0) epsilon += abs(20 * u) >= SPHP.c0 ? 1 : abs(20 * u) / SPHP.c0;
-		solidForce = contactNormal * Rd * epsilon;
+		I.contactForce[idx] = contactNormal * Rd * epsilon;
 	}
-	I.contactForce[idx] += solidForce;
 }
 
 __global__ void addBoundaryForceTorque2DEM(Sphere sph,
 	ContactParameter CP,
 	BoundaryWall wall,
-	double3 pointOnWall,
-	double3 wallNormal,
+	double3 minBound,
+	double3 maxBound,
+	double3 coordinateAxisDirection,
 	double timeStep)
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx >= sph.num) return;
-	if (sph.state.inverseMass[idx] == 0.) return;
+	if (sph.SPHIndex[idx] >= 0.) return;
 
 	double3 pos = sph.state.positions[idx];
 	double r = sph.radii[idx];
@@ -697,14 +718,17 @@ __global__ void addBoundaryForceTorque2DEM(Sphere sph,
 	double3 rollingSpring = wall.rollingSpring[idx];
 	double3 torsionSpring = wall.torsionSpring[idx];
 
-	double3 contactNormal = -wallNormal;
-	double normalOverlap = r - dot(pointOnWall - pos, contactNormal);
-	double3 contactPoint = pos + contactNormal * dot(pointOnWall - pos, contactNormal);
+	double3 contactNormal = -coordinateAxisDirection;
+	double normalOverlap = r - dot(minBound - pos, contactNormal);
+	double3 contactPoint = pos + contactNormal * dot(minBound - pos, contactNormal);
 
-	double3 contactForce = make_double3(0., 0., 0.);
-	double3 contactTorque = make_double3(0., 0., 0.);
-
-	if (normalOverlap <= 0. || normalOverlap > r)
+	if (normalOverlap <= 0.)
+	{
+		contactNormal = coordinateAxisDirection;
+		normalOverlap = r - dot(maxBound - pos, contactNormal);
+		contactPoint = pos + contactNormal * dot(maxBound - pos, contactNormal);
+	}
+	if (normalOverlap <= 0.)
 	{
 		wall.slidingSpring[idx] = make_double3(0., 0., 0.);
 		wall.rollingSpring[idx] = make_double3(0., 0., 0.);
@@ -712,6 +736,8 @@ __global__ void addBoundaryForceTorque2DEM(Sphere sph,
 		return;
 	}
 	
+	double3 contactForce = make_double3(0., 0., 0.);
+	double3 contactTorque = make_double3(0., 0., 0.);
 	double3 relativeVelocityAtContact = -(sph.state.velocities[idx] + cross(sph.state.angularVelocities[idx], contactPoint - pos));
 	double3 relativeAngularVelocityAtContact = -sph.state.angularVelocities[idx];
 	double effectiveMass = 1. / sph.state.inverseMass[idx];
@@ -749,37 +775,44 @@ __global__ void addBoundaryForceTorque2DEM(Sphere sph,
 
 __global__ void addBoundaryForceTorque2SPH(Sphere sph,
 	SPH SPHP,
-	double3 pointOnWall,
-	double3 wallNormal)
+	double3 minBound,
+	double3 maxBound,
+	double3 coordinateAxisDirection)
 {
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx >= sph.num) return;
-	if (sph.state.inverseMass[idx] == 0.) return;
+	if (sph.SPHIndex[idx] < 0.) return;
 
 	double3 pos = sph.state.positions[idx];
 	double r = sph.radii[idx];
 	
-	double3 contactNormal = -wallNormal;
-	double3 contactPoint = pos + contactNormal * dot(pointOnWall - pos, contactNormal);
-	double3 contactForce = make_double3(0., 0., 0.);
+	double3 contactNormal = -coordinateAxisDirection;
+	double normalOverlap = r - dot(minBound - pos, contactNormal);
+	double3 contactPoint = pos + contactNormal * dot(minBound - pos, contactNormal);
 
-	if (sph.SPHIndex[idx] >= 0)
+	if (normalOverlap <= 0)
 	{
-		double h = r;
-		double dis = 2 * length(pos - contactPoint);
-		double q = dis / (2 * h);
-		if (q > 0. && q <= 1.)
-		{
-			double u = dot(-sph.state.velocities[idx], contactNormal);
-			double A = 0.01 * pow(SPHP.c0, 2) / h;
-			double Rd = A * (1 - q) / sqrt(q);
-			double relZ = pos.z - SPHP.z0;
-			double absH = abs(relZ / SPHP.H0);
-			double epsilon = relZ >= 0 ? 0.02 : absH + 0.02;
-			if (absH > 1) epsilon = 1;
-			if (u < 0) epsilon += abs(20 * u) >= SPHP.c0 ? 1 : abs(20 * u) / SPHP.c0;
-			contactForce = contactNormal * Rd * epsilon;
-		}
+		contactNormal = coordinateAxisDirection;
+		normalOverlap = r - dot(maxBound - pos, contactNormal);
+		contactPoint = pos + contactNormal * dot(maxBound - pos, contactNormal);
+	}
+	if (normalOverlap <= 0) return;
+
+	double3 contactForce = make_double3(0., 0., 0.);
+	double h = r;
+	double dis = length(pos - contactPoint);
+	double q = dis / h;
+	if (q > 0. && q <= 1.)
+	{
+		double u = dot(-sph.state.velocities[idx], contactNormal);
+		double A = 0.01 * pow(SPHP.c0, 2) / h;
+		double Rd = A * (1 - q) / sqrt(q);
+		double relZ = pos.z - SPHP.z0;
+		double absH = abs(relZ / SPHP.H0);
+		double epsilon = relZ >= 0 ? 0.02 : absH + 0.02;
+		if (absH > 1) epsilon = 1;
+		if (u < 0) epsilon += abs(20 * u) >= SPHP.c0 ? 1 : abs(20 * u) / SPHP.c0;
+		contactForce = contactNormal * Rd * epsilon;
 	}
 	sph.state.forces[idx] -= contactForce;
 }
@@ -790,6 +823,8 @@ __global__ void accumulateSphereForceTorqueA(Sphere sph,
 	int idx = blockIdx.x * blockDim.x + threadIdx.x;
 	if (idx >= sph.num) return;
 
+	sph.state.forces[idx] = make_double3(0, 0, 0);
+	sph.state.torques[idx] = make_double3(0, 0, 0);
 	for (int i = idx > 0 ? sph.neighbor.prefixSum[idx - 1] : 0; i < sph.neighbor.prefixSum[idx]; i++)
 	{
 		double3 forceA = I.contactForce[i];
@@ -820,6 +855,15 @@ __global__ void accumulateSphereForceTorqueB(double3* forces, double3* torques,
 		forces[idx] += forceB;
 		torques[idx] += torqueB;
 	}
+}
+
+__global__ void clearTriangleWallForceTorque(double3* forces, double3* torques,
+	int num)
+{
+	int idx = blockIdx.x * blockDim.x + threadIdx.x;
+	if (idx >= num) return;
+	forces[idx] = make_double3(0., 0., 0.);
+	torques[idx] = make_double3(0., 0., 0.);
 }
 
 __global__ void accumulateTriangleWallForceTorque(double3* forces, double3* torques,
@@ -862,7 +906,7 @@ void SPHDensityShephardFilter(DeviceData& d, int maxThreadsPerBlock)
 	//cudaDeviceSynchronize();
 }
 
-void sphere2SphereDEM(DeviceData& d, double timeStep, int maxThreadsPerBlock, int iStep)
+void sphere2SphereDEM(DeviceData& d, double timeStep, int maxThreadsPerBlock)
 {
 	int grid = 1, block = 1;
 	int numObjects = 0;
@@ -871,7 +915,7 @@ void sphere2SphereDEM(DeviceData& d, double timeStep, int maxThreadsPerBlock, in
 	if (numObjects > 0)
 	{
 		computeGPUParameter(grid, block, numObjects, maxThreadsPerBlock);
-		calSphereSphereContactForceTorque << <grid, block >> > (d.sphSphInteract,
+		calSolidSphereContactForceTorque << <grid, block >> > (d.sphSphInteract,
 			d.spheres,
 			d.contactPara,
 			timeStep);
@@ -937,7 +981,7 @@ void wall2SphereDEM(DeviceData& d, double timeStep, int maxThreadsPerBlock)
 	if (numObjects > 0)
 	{
 		computeGPUParameter(grid, block, numObjects, maxThreadsPerBlock);
-		calTriangleWallSphereContactForceTorque << <grid, block >> > (d.faceSphInteract,
+		calTriangleWallSolidSphereContactForceTorque << <grid, block >> > (d.faceSphInteract,
 			d.spheres,
 			d.triangleWalls.face.face2Wall,
 			d.triangleWalls.materialIndex,
@@ -951,7 +995,7 @@ void wall2SphereDEM(DeviceData& d, double timeStep, int maxThreadsPerBlock)
 	if (numObjects > 0)
 	{
 		computeGPUParameter(grid, block, numObjects, maxThreadsPerBlock);
-		calTriangleWallSphereContactForceTorque << <grid, block >> > (d.edgeSphInteract,
+		calTriangleWallSolidSphereContactForceTorque << <grid, block >> > (d.edgeSphInteract,
 			d.spheres,
 			d.triangleWalls.edge.edge2Wall,
 			d.triangleWalls.materialIndex,
@@ -965,7 +1009,7 @@ void wall2SphereDEM(DeviceData& d, double timeStep, int maxThreadsPerBlock)
 	if (numObjects > 0)
 	{
 		computeGPUParameter(grid, block, numObjects, maxThreadsPerBlock);
-		calTriangleWallSphereContactForceTorque << <grid, block >> > (d.vertexSphInteract,
+		calTriangleWallSolidSphereContactForceTorque << <grid, block >> > (d.vertexSphInteract,
 			d.spheres,
 			d.triangleWalls.vertex.vertex2Wall,
 			d.triangleWalls.materialIndex,
@@ -984,6 +1028,7 @@ void wall2SphereSPH(DeviceData& d, int maxThreadsPerBlock)
 	numObjects = d.faceSphInteract.num;
 	if (numObjects > 0)
 	{
+		computeGPUParameter(grid, block, numObjects, maxThreadsPerBlock);
 		calTriangleWallSPHForce << <grid, block >> > (d.faceSphInteract,
 			d.SPHParticles,
 			d.spheres,
@@ -995,6 +1040,7 @@ void wall2SphereSPH(DeviceData& d, int maxThreadsPerBlock)
 	numObjects = d.edgeSphInteract.num;
 	if (numObjects > 0)
 	{
+		computeGPUParameter(grid, block, numObjects, maxThreadsPerBlock);
 		calTriangleWallSPHForce << <grid, block >> > (d.edgeSphInteract,
 			d.SPHParticles,
 			d.spheres,
@@ -1006,6 +1052,7 @@ void wall2SphereSPH(DeviceData& d, int maxThreadsPerBlock)
 	numObjects = d.vertexSphInteract.num;
 	if (numObjects > 0)
 	{
+		computeGPUParameter(grid, block, numObjects, maxThreadsPerBlock);
 		calTriangleWallSPHForce << <grid, block >> > (d.vertexSphInteract,
 			d.SPHParticles,
 			d.spheres,
@@ -1017,64 +1064,39 @@ void wall2SphereSPH(DeviceData& d, int maxThreadsPerBlock)
 
 void boundary2SphereDEM(DeviceData& d, double timeStep, int maxThreadsPerBlock)
 {
-	double3 wallNormal = make_double3(0., 0., 0.);
 	int grid = 1, block = 1;
 	int numObjects = d.spheres.num;
 	computeGPUParameter(grid, block, numObjects, maxThreadsPerBlock);
 	if (d.boundaryWallX.numSpring > 0)
 	{
-		wallNormal = make_double3(1., 0., 0.);
 		addBoundaryForceTorque2DEM << <grid, block >> > (d.spheres,
 			d.contactPara,
 			d.boundaryWallX,
 			d.spatialGrids.minBound,
-			wallNormal,
-			timeStep);
-		//cudaDeviceSynchronize();
-		wallNormal = make_double3(-1., 0., 0.);
-		addBoundaryForceTorque2DEM << <grid, block >> > (d.spheres,
-			d.contactPara,
-			d.boundaryWallX,
 			d.spatialGrids.maxBound,
-			wallNormal,
+			make_double3(1., 0., 0.),
 			timeStep);
 		//cudaDeviceSynchronize();
 	}
 	if (d.boundaryWallY.numSpring > 0)
 	{
-		wallNormal = make_double3(0., 1., 0.);
 		addBoundaryForceTorque2DEM << <grid, block >> > (d.spheres,
 			d.contactPara,
 			d.boundaryWallY,
 			d.spatialGrids.minBound,
-			wallNormal,
-			timeStep);
-		//cudaDeviceSynchronize();
-		wallNormal = make_double3(0., -1., 0.);
-		addBoundaryForceTorque2DEM << <grid, block >> > (d.spheres,
-			d.contactPara,
-			d.boundaryWallY,
 			d.spatialGrids.maxBound,
-			wallNormal,
+			make_double3(0., 1., 0.),
 			timeStep);
 		//cudaDeviceSynchronize();
 	}
 	if (d.boundaryWallZ.numSpring > 0)
 	{
-		wallNormal = make_double3(0., 0., 1.);
 		addBoundaryForceTorque2DEM << <grid, block >> > (d.spheres,
 			d.contactPara,
 			d.boundaryWallZ,
 			d.spatialGrids.minBound,
-			wallNormal,
-			timeStep);
-		//cudaDeviceSynchronize();
-		wallNormal = make_double3(0., 0., -1.);
-		addBoundaryForceTorque2DEM << <grid, block >> > (d.spheres,
-			d.contactPara,
-			d.boundaryWallZ,
 			d.spatialGrids.maxBound,
-			wallNormal,
+			make_double3(0., 0., 1.),
 			timeStep);
 		//cudaDeviceSynchronize();
 	}
@@ -1090,12 +1112,8 @@ void boundary2SphereSPH(DeviceData& d, int maxThreadsPerBlock)
 		addBoundaryForceTorque2SPH << <grid, block >> > (d.spheres,
 			d.SPHParticles,
 			d.spatialGrids.minBound,
-			make_double3(1., 0., 0.));
-		//cudaDeviceSynchronize();
-		addBoundaryForceTorque2SPH << <grid, block >> > (d.spheres,
-			d.SPHParticles,
 			d.spatialGrids.maxBound,
-			make_double3(-1., 0., 0.));
+			make_double3(1., 0., 0.));
 		//cudaDeviceSynchronize();
 	}
 	if (d.boundaryWallY.numSpring > 0)
@@ -1103,12 +1121,8 @@ void boundary2SphereSPH(DeviceData& d, int maxThreadsPerBlock)
 		addBoundaryForceTorque2SPH << <grid, block >> > (d.spheres,
 			d.SPHParticles,
 			d.spatialGrids.minBound,
-			make_double3(0., 1., 0.));
-		//cudaDeviceSynchronize();
-		addBoundaryForceTorque2SPH << <grid, block >> > (d.spheres,
-			d.SPHParticles,
 			d.spatialGrids.maxBound,
-			make_double3(0., -1., 0.));
+			make_double3(0., 1., 0.));
 		//cudaDeviceSynchronize();
 	}
 	if (d.boundaryWallZ.numSpring > 0)
@@ -1116,23 +1130,17 @@ void boundary2SphereSPH(DeviceData& d, int maxThreadsPerBlock)
 		addBoundaryForceTorque2SPH << <grid, block >> > (d.spheres,
 			d.SPHParticles,
 			d.spatialGrids.minBound,
-			make_double3(0., 0., 1.));
-		//cudaDeviceSynchronize();
-		addBoundaryForceTorque2SPH << <grid, block >> > (d.spheres,
-			d.SPHParticles,
 			d.spatialGrids.maxBound,
-			make_double3(0., 0., -1.));
+			make_double3(0., 0., 1.));
 		//cudaDeviceSynchronize();
 	}
 }
 
-void calculateContactForceTorqueDEM(DeviceData& d, double timeStep, int maxThreadsPerBlock, int iStep)
+void calculateContactForceTorqueDEM(DeviceData& d, double timeStep, int maxThreadsPerBlock)
 {
-	sphere2SphereDEM(d, timeStep, maxThreadsPerBlock, iStep);
+	sphere2SphereDEM(d, timeStep, maxThreadsPerBlock);
 
 	wall2SphereDEM(d, timeStep, maxThreadsPerBlock);
-
-	boundary2SphereDEM(d, timeStep, maxThreadsPerBlock);
 }
 
 void calculateContactForceTorqueSPH(DeviceData& d, double timeStep, int maxThreadsPerBlock, int iStep)
@@ -1140,8 +1148,6 @@ void calculateContactForceTorqueSPH(DeviceData& d, double timeStep, int maxThrea
 	sphere2SphereSPH(d, timeStep, maxThreadsPerBlock, iStep);
 
 	wall2SphereSPH(d, maxThreadsPerBlock);
-
-	boundary2SphereSPH(d, maxThreadsPerBlock);
 }
 
 void calculateContactForceTorqueDEMSPH(DeviceData& d, int maxThreadsPerBlock)
@@ -1201,6 +1207,11 @@ void accumulateForceTorque(DeviceData& d, int maxThreadsPerBlock)
 			d.spheres.num);
 		//cudaDeviceSynchronize();
 
+		numObjects = d.triangleWalls.num;
+		computeGPUParameter(grid, block, numObjects, maxThreadsPerBlock);
+		clearTriangleWallForceTorque << <grid, block >> > (d.triangleWalls.state.forces, d.triangleWalls.state.torques,
+			d.triangleWalls.num);
+		//cudaDeviceSynchronize();
 		numObjects = d.triangleWalls.face.num;
 		computeGPUParameter(grid, block, numObjects, maxThreadsPerBlock);
 		accumulateTriangleWallForceTorque << <grid, block >> > (d.triangleWalls.state.forces, d.triangleWalls.state.torques,

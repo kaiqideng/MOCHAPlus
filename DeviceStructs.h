@@ -969,11 +969,11 @@ struct DeviceData
     BasicInteraction    faceSphInteract;
     BasicInteraction    edgeSphInteract;
     BasicInteraction    vertexSphInteract;
+    ContactParameter    contactPara;
+    SpatialGrid         spatialGrids;
     BoundaryWall  boundaryWallX;
     BoundaryWall  boundaryWallY;
     BoundaryWall  boundaryWallZ;
-    ContactParameter    contactPara;
-    SpatialGrid         spatialGrids;
 
     void copyFromHost(const HostData& h)
     {

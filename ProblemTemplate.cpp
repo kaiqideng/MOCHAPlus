@@ -84,10 +84,10 @@ public:
 	}
 };
 
-class DamBreak: public DEMSolver
+class DamBreak: public SPHSolver
 {
 public:
-	DamBreak():DEMSolver(){}
+	DamBreak():SPHSolver(){}
 
 	void loadHostData(HostData& h)override
 	{
@@ -97,9 +97,12 @@ public:
 
 		h.SPHParticles.createBlockSample(h.spheres, make_double3(0, 0, 0), make_double3(0.4, 0.6, 0.3), 1000, 0.0125, 0.01, 0, 30, 0);
 		h.triangleWalls.addBoxWall(make_double3(0.9, 0.24, 0.), make_double3(0.12, 0.12, 0.6), 1);
-
+		//h.triangleWalls.addBoxWall(make_double3(0, 0, 0), make_double3(1.6, 0.6, 0.6), 1);
 		setDomainGravity(make_double3(0, 0, 0), make_double3(1.6, 0.6, 0.6), make_double3(0., 0., -9.81));
-		setTimeMaxTimeStepPrintNumber(10, 1e-5, 250);
+		setBoundaryWallX(0);
+		setBoundaryWallY(0);
+		setBoundaryWallZ(0);
+		setTimeMaxTimeStepPrintNumber(10, 0.25 * h.spheres.radii[0] / h.SPHParticles.c0, 250);
 	}
 
 	void outputData(int frame) override
@@ -379,6 +382,6 @@ public:
 
 int main()
 {
-	Icebreaker problem;
+	DamBreak problem;
 	problem.solve();
 }

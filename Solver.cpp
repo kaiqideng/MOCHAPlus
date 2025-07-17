@@ -40,7 +40,7 @@ void Solver::solve()
     if (!buildDeviceData()) return;
 
     neighborSearch(dev, maxThreadsPerBlock, 0);
-    setBond(dev, maxThreadsPerBlock);
+    this->setBond(dev, maxThreadsPerBlock);
     int iFrame = 0;
     outputData(iFrame);
     while (iStep <= stepMax)
@@ -48,9 +48,10 @@ void Solver::solve()
         computeTime_neighborSearch += timeHostFunc([&]() { neighborSearch(dev, maxThreadsPerBlock, iStep); });
         computeTime_integration += timeHostFunc([&]() { integrateBeforeContact(dev, gravity, timeStep, maxThreadsPerBlock); });
         handleDataBeforeContact();
-        computeTime_contact += timeHostFunc([&]() { calculateParticleContactForceTorque(dev, timeStep, maxThreadsPerBlock, iStep); });
+        computeTime_contact += timeHostFunc([&]() { this->calculateParticleContactForceTorque(dev, timeStep, maxThreadsPerBlock, iStep); });
         handleDataAfterContact();
-        computeTime_integration += timeHostFunc([&]() { accumulateForceTorque(dev, maxThreadsPerBlock);});
+        computeTime_contact += timeHostFunc([&]() { accumulateForceTorque(dev, maxThreadsPerBlock);});
+        computeTime_contact += timeHostFunc([&]() { this->boundaryForceTorque(dev, timeStep, maxThreadsPerBlock); });
         computeTime_integration += timeHostFunc([&]() { integrateAfterContact(dev, gravity, timeStep, maxThreadsPerBlock);});
         if (iStep % saveAccount == 0)
         {

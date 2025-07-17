@@ -1,14 +1,5 @@
 #include "Integrate.cuh"
 
-__global__ void clearForceTorque(double3* forces, double3* torques,
-	int num)
-{
-	int idx = blockIdx.x * blockDim.x + threadIdx.x;
-	if (idx >= num) return;
-	forces[idx] = make_double3(0., 0., 0.);
-	torques[idx] = make_double3(0., 0., 0.);
-}
-
 __global__ void integrateBeforeContactCalculation(DynamicState state,
 	double3 gravity,
 	double timeStep,
@@ -99,9 +90,6 @@ void integrateBeforeContact(DeviceData& d, double3 gravity, double timeStep, int
 	//	d.SPHParticles,
 	//	timeStep);
 	//cudaDeviceSynchronize();
-	clearForceTorque << <grid, block >> > (d.spheres.state.forces, d.spheres.state.torques,
-		d.spheres.num);
-	//cudaDeviceSynchronize();
 
 	if (d.triangleWalls.num > 0)
 	{
@@ -110,9 +98,6 @@ void integrateBeforeContact(DeviceData& d, double3 gravity, double timeStep, int
 		integrateBeforeContactCalculation << <grid, block >> > (d.triangleWalls.state, 
 			gravity, 
 			timeStep, 
-			d.triangleWalls.num);
-		//cudaDeviceSynchronize();
-		clearForceTorque << <grid, block >> > (d.triangleWalls.state.forces, d.triangleWalls.state.torques,
 			d.triangleWalls.num);
 		//cudaDeviceSynchronize();
 	}
